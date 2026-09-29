@@ -14,15 +14,17 @@ RUN pip install --no-cache-dir -r requirements.txt \
 
 # Modelo de Tesseract entrenado para la fuente OCR-B de la MRZ. Sale del repositorio de FastMRZ
 # (AGPL-3.0, sin licencia propia ni origen documentado): ver «Licencias» en el README.
+# Incluido por defecto para evaluar en el lab. Para una imagen de producción sin él:
+#   docker build --build-arg INCLUIR_MODELO_MRZ_AGPL=false .
 # Se verifica el hash: si el fichero cambia en origen, el build falla en vez de usar otro modelo.
+ARG INCLUIR_MODELO_MRZ_AGPL=true
 ARG MRZ_TRAINEDDATA_URL=https://raw.githubusercontent.com/sivakumar-mahalingam/fastmrz/main/tessdata/mrz.traineddata
 ARG MRZ_TRAINEDDATA_SHA256=e44f5b7a6bdd3f382ef3bfa84ee0057f5897946a84a094c26910e0a124f3a9bd
-RUN mkdir -p /opt/tessdata \
- && curl -fsSL -o /opt/tessdata/mrz.traineddata "$MRZ_TRAINEDDATA_URL" \
- && echo "$MRZ_TRAINEDDATA_SHA256  /opt/tessdata/mrz.traineddata" | sha256sum -c -
+RUN mkdir -p /opt/tessdata  && if [ "$INCLUIR_MODELO_MRZ_AGPL" = "true" ]; then       curl -fsSL -o /opt/tessdata/mrz.traineddata "$MRZ_TRAINEDDATA_URL"       && echo "$MRZ_TRAINEDDATA_SHA256  /opt/tessdata/mrz.traineddata" | sha256sum -c - ;     fi
 
 COPY umbrales.yaml .
 COPY mrzlab ./mrzlab
+COPY servicio ./servicio
 COPY plantillas ./plantillas
 
 # Todos los modelos quedan dentro de la imagen: en ejecución no se descarga nada.
@@ -33,5 +35,6 @@ RUN python -c "from rapidocr_onnxruntime import RapidOCR; RapidOCR()"
 
 RUN useradd --create-home --uid 10001 lab && chown lab /app/plantillas
 USER lab
-EXPOSE 8080
+# Por defecto arranca el lab (8080). El servicio: uvicorn servicio.app:app --port 8001
+EXPOSE 8080 8001
 CMD ["uvicorn", "mrzlab.app:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]

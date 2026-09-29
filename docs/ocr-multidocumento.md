@@ -1,6 +1,6 @@
 # Hacia un OCR local multi-documento
 
-Propuesta para llevar lo que hace MRZ Lab con el DNI a **otros documentos** (titulaciones,
+Propuesta para llevar lo que hace el lab con el DNI a **otros documentos** (titulaciones,
 certificados, pólizas…) y servirlo como un **servicio OCR propio, sin nube**, con un endpoint por
 tipo de documento.
 
@@ -131,9 +131,9 @@ servidor. Si quien lo usa está en el mismo servidor, es más seguro dejarlo sol
 de Docker: los documentos no viajan por internet. Si se expone, además de HTTPS y la clave: límite
 de peticiones por IP o lista de IPs permitidas.
 
-## Relación con MRZ Lab
+## Relación entre el lab y el servicio
 
-MRZ Lab es el **banco de pruebas**: aquí se comparan motores, se calibran umbrales y plantillas y se
+El lab es el **banco de pruebas**: aquí se comparan motores, se calibran umbrales y plantillas y se
 mide cada extractor con lotes y `verdad.csv`. El servicio es la **versión de producción** de lo que
 aquí funcione. Para otros documentos, el lab necesitaría:
 

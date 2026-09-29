@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MRZ Lab</title>
+<title>OCR Doc Lab</title>
 <style>
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #5d6677; --line: #dde1e8;
@@ -85,7 +85,7 @@
 </head>
 <body>
 <main>
-  <h1>MRZ Lab</h1>
+  <h1>OCR Doc Lab</h1>
   <p class="sub">Comparativa local de motores OCR sobre la MRZ del DNI, con evaluación de calidad de la foto.
      Las imágenes se procesan en este ordenador y no se guardan.</p>
 
@@ -493,7 +493,7 @@ function descargarCSV() {
   // Sin datos personales (DNI, nombre, fechas): el CSV solo lleva métricas y aciertos.
   const csv = [cab, ...filas].map((f) => f.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
   const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
-  const a = Object.assign(document.createElement("a"), { href: url, download: "mrz-lab-resultados.csv" });
+  const a = Object.assign(document.createElement("a"), { href: url, download: "ocr-doc-lab-resultados.csv" });
   a.click();
   URL.revokeObjectURL(url);
 }

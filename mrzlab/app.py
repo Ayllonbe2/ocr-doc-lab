@@ -1,4 +1,4 @@
-"""MRZ Lab: API local para comparar motores OCR sobre la MRZ del DNI.
+"""OCR Doc Lab (laboratorio): API local para comparar motores OCR sobre la MRZ del DNI.
 
 Las imágenes se procesan en memoria y no se guardan en disco ni se registran en logs.
 """
@@ -19,7 +19,7 @@ RAIZ = Path(__file__).resolve().parent
 UMBRALES_RUTA = Path(os.getenv("UMBRALES", RAIZ.parent / "umbrales.yaml"))
 MAX_BYTES = 25 * 1024 * 1024
 
-app = FastAPI(title="MRZ Lab", docs_url=None, redoc_url=None)
+app = FastAPI(title="OCR Doc Lab", docs_url=None, redoc_url=None)
 
 
 def _jpeg_b64(img: np.ndarray, ancho_max: int) -> str:

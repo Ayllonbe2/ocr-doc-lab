@@ -1,7 +1,7 @@
 services:
-  mrz-lab:
+  lab:
     build: .
-    image: mrz-lab:local
+    image: ocr-doc-lab:local
     # Solo accesible desde este ordenador.
     ports:
       - "127.0.0.1:8080:8080"
@@ -10,6 +10,23 @@ services:
       - ./umbrales.yaml:/app/umbrales.yaml:ro
       # Plantilla de posiciones del anverso (solo coordenadas): se escribe al aprender.
       - ./plantillas:/app/plantillas
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  # Servicio de producción (API sin estado): docker compose --profile servicio up servicio
+  servicio:
+    image: ocr-doc-lab:local
+    profiles: [servicio]
+    command: ["uvicorn", "servicio.app:app", "--host", "0.0.0.0", "--port", "8001", "--no-access-log"]
+    ports:
+      - "127.0.0.1:8001:8001"
+    environment:
+      # En local se puede arrancar sin clave; en producción, OCR_API_KEY obligatoria.
+      OCR_API_KEY: ${OCR_API_KEY:-}
+      OCR_ALLOW_ANONYMOUS: ${OCR_ALLOW_ANONYMOUS:-true}
+    volumes:
+      - ./plantillas:/app/plantillas:ro
     read_only: true
     tmpfs:
       - /tmp

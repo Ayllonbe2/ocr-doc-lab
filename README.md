@@ -1,7 +1,15 @@
-# MRZ Lab
+# OCR Doc Lab
 
-Herramienta **local** para evaluar OCR sin nube sobre el DNI español antes de integrarlo en
-una aplicación. Compara motores leyendo la **MRZ** (las 3 líneas `IDESP…<<<` del reverso),
+OCR **local, sin nube**, para documentos: un **laboratorio** para evaluar y calibrar, y un
+**servicio** HTTP de producción que usa el mismo código. Hoy cubre el DNI español; la idea es
+añadir más documentos (ver [OCR local multi-documento](docs/ocr-multidocumento.md)).
+
+| | Qué es | Arrancar |
+|---|---|---|
+| **Lab** (`mrzlab/`) | Página local para comparar motores, ver lo que lee el OCR, medir la calidad de la foto y calibrar | `docker compose up --build` → <http://localhost:8080> |
+| **Servicio** (`servicio/`) | API sin estado: `POST /v1/dni/verificar` (anverso + reverso + DNI declarado) | `docker compose --profile servicio up --build servicio` → <http://localhost:8001>. Ver [servicio/README.md](servicio/README.md) |
+
+Con el DNI, el lab compara motores leyendo la **MRZ** (las 3 líneas `IDESP…<<<` del reverso),
 valida los dígitos de control, lee los campos del anverso y evalúa la calidad de la foto
 (borrosa, oscura, sobreexpuesta, reflejos, resolución).
 
@@ -20,7 +28,8 @@ excepción en el modelo `mrz` de Tesseract (ver [Licencias](#licencias)).
 Requisitos: Docker Desktop.
 
 ```bash
-cd herramientas/mrz-lab
+git clone https://github.com/Ayllonbe2/ocr-doc-lab.git
+cd ocr-doc-lab
 docker compose up --build
 ```
 
@@ -32,7 +41,7 @@ vez, desconecta la red y vuelve a lanzar `docker compose up`.
 
 1. Python 3.11 o 3.12.
 2. Tesseract para Windows (instalador de UB Mannheim) y añade su carpeta al `PATH`.
-3. En PowerShell, dentro de `herramientas/mrz-lab`:
+3. En PowerShell, dentro de la carpeta del repositorio:
 
 ```powershell
 python -m venv .venv
@@ -89,7 +98,7 @@ formato del soporte, nombre sin dígitos).
 > **Importante:** en la MRZ del DNI, **la línea del nombre y el sexo no tienen dígito de
 > control**. Una MRZ válida garantiza el nº de DNI, el soporte y las fechas, pero el nombre
 > puede venir mal leído («NAWVARRO», «3OSE»). En producción, el nombre se debe contrastar con
-> el que declara el usuario (con tolerancia a errores de un carácter), como ya hace el backend.
+> el que declara el usuario (con tolerancia a errores de un carácter), como hace el servicio.
 > Tampoco están del todo protegidas las **3 letras del nº de soporte**: el control ICAO no
 > distingue letras cuyo valor difiere en 10 (M/W, F/P, G/Q, K/U…). En las pruebas apareció un
 > «MNU» leído por «WNU» con todos los controles correctos. El nº de DNI y las fechas sí están
@@ -107,12 +116,13 @@ python -m mrzlab.lote CARPETA --csv resultados.csv --procesos 4
 - `--motores tesseract,rapidocr`: solo esos motores. `--max 100`: solo las 100 primeras.
 - Escribe un CSV sin datos personales e imprime un resumen en la terminal.
 
-Con Docker (en PowerShell, desde `herramientas/mrz-lab`):
+Con Docker (en PowerShell, desde la carpeta del repositorio; cambia `C:\ruta\fotos` por la tuya):
+utaotos` por la tuya):
 
 ```powershell
-docker compose run --rm -v C:
-utaotos:/fotos:ro -v ${PWD}
-esultados:/resultados mrz-lab `
+docker compose run --rm -v C:\ruta\fotos:/fotos:ro -v ${PWD}\resultados:/resultados lab `
+utaotos:/fotos:ro -v ${PWD}
+esultados:/resultados lab `
   python -m mrzlab.lote /fotos --csv /resultados/lote.csv --procesos 4
 ```
 
@@ -263,6 +273,12 @@ mrzlab/
   lote.py        modo por lotes y comparación con verdad.csv
   sintetico.py   DNI ficticios, degradaciones "de móvil" y generador de lotes
   static/index.html
+servicio/        API de producción sobre mrzlab (ver servicio/README.md)
+  app.py         app FastAPI: X-Api-Key, /health
+  api.py         POST /v1/dni/verificar
+  lectura.py     lectura de cada cara del DNI
+  verificacion.py  decisión: VERIFICADO / REPETIR / REVISION_ADMIN
+docs/            propuestas (OCR multi-documento)
 umbrales.yaml    umbrales de calidad (editables)
 plantillas/      plantilla de posiciones del anverso (solo coordenadas)
 CONSENTIMIENTO.md  plantilla para voluntarios
