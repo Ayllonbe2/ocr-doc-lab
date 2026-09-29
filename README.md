@@ -298,7 +298,7 @@ Los tests de extremo a extremo se saltan los motores que no estén instalados.
 
 [Hacia un OCR local multi-documento](docs/ocr-multidocumento.md): llevar esto a otros documentos
 (titulaciones, certificados…) con un extractor por tipo y un servicio con un endpoint por
-documento, y cómo servirlo en su propio subdominio.
+documento, siempre en localhost. Plan de desarrollo con sus pruebas: [Roadmap](docs/roadmap.md).
 
 ## Licencias
 

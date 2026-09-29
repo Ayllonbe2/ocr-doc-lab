@@ -1,7 +1,7 @@
 # Hacia un OCR local multi-documento
 
 Propuesta para llevar lo que hace el lab con el DNI a **otros documentos** (titulaciones,
-certificados, pólizas…) y servirlo como un **servicio OCR propio, sin nube**, con un endpoint por
+certificados, pólizas…) y servirlo como un **servicio OCR propio, sin nube y solo en localhost**, con un endpoint por
 tipo de documento.
 
 Estado: propuesta, sin implementar.
@@ -92,44 +92,28 @@ El riesgo está en el paso 2: en documentos desordenados o de mala calidad un OC
 leer mejor. Por eso se mide antes de cambiar, y la calidad de imagen sirve para pedir otra foto en
 vez de dar por bueno un dato dudoso.
 
-## Servirlo en su propio subdominio
+## Solo en localhost
 
-Por ejemplo `ocr.ejemplo.es`, con Docker y [Caddy](https://caddyserver.com/) como proxy inverso
-(certificado HTTPS automático):
+El servicio **no se expone**: ni subdominio, ni proxy público, ni puerto abierto a internet. Escucha
+en `127.0.0.1` (o solo en la red interna de Docker) y lo usa quien corre en la misma máquina, así
+que los documentos nunca viajan por la red.
 
-1. **DNS:** registro `A` `ocr` → IP del servidor (y `AAAA` si usa IPv6).
-2. **Proxy:**
+```yaml
+ocr:
+  build: .
+  ports:
+    - "127.0.0.1:8001:8001"      # o sin «ports» si quien llama está en la misma red de Docker
+  environment:
+    OCR_API_KEY: ${OCR_API_KEY:?}
+  deploy:
+    resources:
+      limits:
+        cpus: "2"                # el OCR gasta varios segundos de CPU por documento
+        memory: 3g
+```
 
-   ```caddyfile
-   ocr.ejemplo.es {
-       request_body {
-           max_size 16MB
-       }
-       reverse_proxy ocr:8001
-   }
-   ```
-
-3. **Docker Compose:** el contenedor del OCR en la misma red que Caddy, sin publicar su puerto
-   al exterior, y con límite de CPU, porque el OCR local consume varios segundos de CPU por
-   documento y no debe dejar sin recursos al resto de servicios del servidor:
-
-   ```yaml
-   ocr:
-     build: .
-     environment:
-       OCR_API_KEY: ${OCR_API_KEY:?}
-     networks: [web]
-     deploy:
-       resources:
-         limits:
-           cpus: "2"
-           memory: 3g
-   ```
-
-**¿Hace falta exponerlo?** Solo si lo van a llamar clientes de fuera del servidor o si vive en otro
-servidor. Si quien lo usa está en el mismo servidor, es más seguro dejarlo solo en la red interna
-de Docker: los documentos no viajan por internet. Si se expone, además de HTTPS y la clave: límite
-de peticiones por IP o lista de IPs permitidas.
+La clave `X-Api-Key` queda como segunda barrera frente a otros procesos de la misma máquina.
+Plan de desarrollo, tipo a tipo y con sus pruebas: [Roadmap](roadmap.md).
 
 ## Relación entre el lab y el servicio
 
