@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MRZ Lab</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #5d6677; --line: #dde1e8;
+    --accent: #2957c9; --ok: #1f8a4c; --warn: #b7791f; --bad: #c53030;
+    --ok-bg: #e6f4ec; --warn-bg: #fdf3e1; --bad-bg: #fbe9e9; --code: #f0f2f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171d; --panel: #1c2028; --text: #e6e9ef; --muted: #9aa3b2; --line: #2d333e;
+      --accent: #7aa2ff; --ok: #4cc47e; --warn: #e0a84a; --bad: #f07070;
+      --ok-bg: #173325; --warn-bg: #3a2e17; --bad-bg: #3d1d1d; --code: #242a34;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 0 0 12px; }
+  h3 { font-size: 15px; margin: 16px 0 8px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+           padding: 16px; margin-bottom: 16px; }
+  .fila { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  .chip { display: inline-flex; gap: 6px; align-items: center; padding: 2px 10px;
+          border-radius: 999px; border: 1px solid var(--line); font-size: 13px; }
+  .chip small { color: var(--muted); }
+  #zona { border: 2px dashed var(--line); border-radius: 10px; padding: 28px; text-align: center;
+          color: var(--muted); cursor: pointer; transition: border-color .15s; }
+  #zona.encima { border-color: var(--accent); color: var(--text); }
+  button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--line);
+           background: var(--panel); color: var(--text); cursor: pointer; }
+  button.primario { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  .tabla-scroll { overflow-x: auto; }
+  .n { font-variant-numeric: tabular-nums; }
+  .ok { color: var(--ok); } .dudoso { color: var(--warn); } .mal { color: var(--bad); }
+  .badge { display: inline-block; padding: 1px 9px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+  .b-apta { background: var(--ok-bg); color: var(--ok); }
+  .b-riesgo { background: var(--warn-bg); color: var(--warn); }
+  .b-rechazar { background: var(--bad-bg); color: var(--bad); }
+  .punto { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .punto.ok { background: var(--ok); } .punto.dudoso { background: var(--warn); } .punto.mal { background: var(--bad); }
+  details.res { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; }
+  details.res > summary { padding: 12px 16px; cursor: pointer; display: flex; flex-wrap: wrap;
+                          gap: 8px 14px; align-items: center; list-style: none; }
+  details.res > summary::-webkit-details-marker { display: none; }
+  details.res > summary .nombre { font-weight: 600; word-break: break-all; }
+  .cuerpo { padding: 0 16px 16px; }
+  .imagenes { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; }
+  .imagenes img { width: 100%; border-radius: 6px; border: 1px solid var(--line); display: block; }
+  .leyenda { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .motores { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+  .motor { border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+  pre, code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+  pre { background: var(--code); padding: 8px 10px; border-radius: 6px; margin: 6px 0;
+        overflow-x: auto; font-size: 13px; line-height: 1.45; }
+  ul.avisos { margin: 6px 0 0; padding-left: 18px; }
+  .aviso-info { font-size: 13px; color: var(--muted); }
+  progress { width: 220px; }
+  select { font: inherit; background: var(--panel); color: var(--text); border: 1px solid var(--line);
+           border-radius: 6px; padding: 1px 4px; }
+  .lado { background: var(--code); }
+  .foto { position: relative; }
+  .foto svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .foto rect { fill: none; stroke: #2b8cff; stroke-width: 2; vector-effect: non-scaling-stroke; }
+  .foto rect.activa { stroke: #ff9f1a; stroke-width: 4; fill: rgba(255, 159, 26, .18); }
+  .cajas-motor { font-size: 13px; }
+  .cajas-motor button { padding: 1px 10px; font-size: 13px; }
+  .cajas-motor button.activo { background: var(--accent); color: #fff; border-color: var(--accent); }
+  table.texto td:first-child { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; word-break: break-word; }
+  table.texto tr:hover td { background: var(--code); cursor: default; }
+  .conf-baja { color: var(--warn); }
+  @media (max-width: 760px) { .imagenes { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>MRZ Lab</h1>
+  <p class="sub">Comparativa local de motores OCR sobre la MRZ del DNI, con evaluación de calidad de la foto.
+     Las imágenes se procesan en este ordenador y no se guardan.</p>
+
+  <section class="panel">
+    <h2>Motores</h2>
+    <div class="fila" id="motores"></div>
+    <p class="aviso-info" id="plantilla-estado" style="margin:10px 0 0"></p>
+  </section>
+
+  <section class="panel">
+    <div id="zona" tabindex="0" role="button">
+      <strong>Arrastra aquí fotos del DNI (anverso o reverso)</strong> o haz clic para elegirlas<br>
+      <span class="aviso-info">JPG, PNG o WEBP · puedes soltar varias a la vez</span>
+    </div>
+    <input type="file" id="entrada" accept="image/*" multiple hidden>
+    <div class="fila" style="margin-top:12px">
+      <label class="chip">Cara
+        <select id="lado">
+          <option value="auto" selected>Detectar automáticamente</option>
+          <option value="anverso">Anverso (foto, nombre, nº DNI)</option>
+          <option value="reverso">Reverso (MRZ)</option>
+        </select>
+      </label>
+      <span class="aviso-info">En «automático» se buscan la MRZ y los campos del anverso, y se decide por lo que aparezca.</span>
+    </div>
+    <div class="fila" style="margin-top:12px">
+      <progress id="progreso" value="0" max="1" hidden></progress>
+      <span id="estado" class="aviso-info"></span>
+      <span style="flex:1"></span>
+      <button id="muestras" title="DNI ficticios generados por la herramienta, con distintos defectos">Probar con muestras sintéticas</button>
+      <button id="csv" disabled>Descargar CSV</button>
+      <button id="limpiar" disabled>Limpiar</button>
+    </div>
+  </section>
+
+  <section class="panel" id="resumen" hidden>
+    <h2>Resumen del lote</h2>
+    <div id="resumen-cuerpo"></div>
+  </section>
+
+  <section id="resultados"></section>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const NOMBRES = {
+  nitidez: "Nitidez", brillo: "Brillo", oscuros: "Zonas en sombra", quemados: "Zonas quemadas",
+  contraste: "Contraste", reflejo: "Reflejo", lado_min_px: "Resolución (lado corto)",
+  altura_linea_px: "Alto de línea MRZ (px)", brillo_bajo: "Brillo", brillo_alto: "Brillo",
+};
+const SIN_CONTROL = new Set(["sexo", "apellidos", "nombre"]);
+const FRACCIONES = new Set(["oscuros", "quemados", "reflejo"]);
+const VEREDICTO = { apta: "Apta", riesgo: "Apta con riesgo", rechazar: "Rechazar" };
+let resultados = [];
+let motoresDisponibles = [];
+
+async function cargarEstado() {
+  const pl = await fetch("/api/plantilla").then((r) => r.json());
+  const n = pl.campos ? Math.max(...Object.values(pl.campos).map((c) => c.n)) : 0;
+  $("#plantilla-estado").innerHTML = pl.campos
+    ? `Plantilla del anverso: ${Object.keys(pl.campos).filter((c) => !c.startsWith("etiqueta.")).length} campos y ${Object.keys(pl.campos).filter((c) => c.startsWith("etiqueta.")).length} etiquetas, aprendida de ${n} foto(s). <button id="borrar-plantilla">Borrar plantilla</button>`
+    : "Plantilla del anverso: sin aprender (analiza un anverso bien leído y pulsa «Aprender posiciones»).";
+  $("#borrar-plantilla")?.addEventListener("click", async () => {
+    if (!confirm("¿Borrar la plantilla de posiciones?")) return;
+    await fetch("/api/plantilla", { method: "DELETE" });
+    cargarEstado();
+  });
+  const r = await fetch("/api/estado").then((r) => r.json());
+  motoresDisponibles = r.motores;
+  $("#motores").innerHTML = r.motores.map((m) => `
+    <label class="chip" title="${esc(m.nota || "")}">
+      <input type="checkbox" value="${m.nombre}" ${m.disponible ? "checked" : "disabled"}>
+      ${m.nombre} <small>${esc(m.licencia)}</small>
+      ${m.disponible ? "" : '<span class="mal">no disponible</span>'}
+      ${m.disponible && m.nota ? '<span class="dudoso">⚠</span>' : ""}
+    </label>`).join("");
+}
+
+function motoresElegidos() {
+  return [...document.querySelectorAll("#motores input:checked")].map((i) => i.value);
+}
+
+async function procesar(archivos) {
+  archivos = [...archivos].filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp)$/i.test(f.name));
+  if (!archivos.length) return;
+  const sel = motoresElegidos().join(",");
+  const prog = $("#progreso");
+  prog.hidden = false; prog.max = archivos.length; prog.value = 0;
+  $("#csv").disabled = $("#limpiar").disabled = true;
+  for (const [i, f] of archivos.entries()) {
+    $("#estado").textContent = `Analizando ${i + 1} de ${archivos.length}: ${f.name}`;
+    const fd = new FormData();
+    fd.append("archivo", f);
+    fd.append("motores_sel", sel);
+    fd.append("lado", $("#lado").value);
+    try {
+      const resp = await fetch("/api/analizar", { method: "POST", body: fd });
+      const datos = await resp.json();
+      if (!resp.ok) throw new Error(datos.detail || resp.statusText);
+      resultados.push(datos);
+      pintarResultado(datos);
+    } catch (e) {
+      const d = document.createElement("div");
+      d.className = "panel mal";
+      d.textContent = `${f.name}: ${e.message}`;
+      $("#resultados").prepend(d);
+    }
+    prog.value = i + 1;
+    pintarResumen();
+  }
+  $("#estado").textContent = `${resultados.length} imagen(es) analizadas`;
+  prog.hidden = true;
+  $("#csv").disabled = $("#limpiar").disabled = !resultados.length;
+}
+
+const LADO = { anverso: "Anverso", reverso: "Reverso", desconocido: "Cara no reconocida" };
+
+// Lectura correcta según la cara: MRZ con todos los controles (reverso) o nº de DNI con
+// letra correcta (anverso, el único dato con control).
+function lecturaOk(r, m) {
+  if (!m?.disponible) return false;
+  if (r.lado === "anverso") return m.texto?.anverso?.dni_valido === true || m.texto?.anverso?.posicion?.dni_valido === true;
+  return m.mrz?.valido === true;
+}
+
+function iconoMotor(r, m) {
+  if (!m.disponible) return '<span class="mal" title="no disponible">⚠</span>';
+  if (lecturaOk(r, m)) return '<span class="ok">✔</span>';
+  if (m.error && r.lado !== "anverso") return '<span class="mal" title="error">⚠</span>';
+  return '<span class="mal">✘</span>';
+}
+
+function tablaCalidad(cal) {
+  const metricas = [...new Set(Object.values(cal.zonas).flatMap((z) => Object.keys(z)))];
+  const celda = (z, k) => {
+    const m = cal.zonas[z]?.[k];
+    if (!m) return "<td>—</td>";
+    const v = FRACCIONES.has(k) ? (m.valor * 100).toFixed(1) + " %" : Math.round(m.valor * 10) / 10;
+    return `<td class="n"><span class="punto ${m.nivel}"></span>${v}</td>`;
+  };
+  return `<div class="tabla-scroll"><table>
+    <tr><th>Métrica</th><th>Foto entera</th><th>Zona MRZ</th></tr>
+    ${metricas.map((k) => `<tr><td>${NOMBRES[k] || k}</td>${celda("global", k)}${celda("mrz", k)}</tr>`).join("")}
+  </table></div>
+  ${cal.avisos.length ? `<ul class="avisos">${cal.avisos.map((a) =>
+      `<li class="${a.nivel}">${esc(a.mensaje)} <span class="aviso-info">(${a.zona === "mrz" ? "zona MRZ" : "foto entera"})</span></li>`).join("")}</ul>`
+    : '<p class="ok">Sin avisos de calidad.</p>'}`;
+}
+
+function bloqueMotor(m) {
+  if (!m.disponible) return `<div class="motor"><h3>${m.motor}</h3><p class="mal">No disponible: ${esc(m.error)}</p></div>`;
+  const r = m.mrz;
+  let html = `<div class="motor"><h3>${m.motor} ${r?.valido ? '<span class="ok">✔</span>' : '<span class="mal">✘</span>'} <span class="aviso-info">${m.ms} ms</span></h3>`;
+  if (m.error) html += `<p class="mal">${esc(m.error)}</p>`;
+  if (r) {
+    html += `<pre>${r.lineas.map(esc).join("\n")}</pre>
+      <div class="fila" style="gap:6px">${Object.entries(r.controles).map(([k, v]) =>
+        `<span class="chip ${v ? "ok" : "mal"}">${v ? "✔" : "✘"} ${k.replace("_", " ")}</span>`).join("")}</div>
+      <div class="tabla-scroll"><table style="margin-top:8px">${Object.entries(r.campos).map(([k, v]) =>
+        `<tr><th>${k.replace("_", " ")}</th><td>${esc(v ?? "—")}${SIN_CONTROL.has(k)
+          ? ' <span class="aviso-info" title="La línea del nombre y el sexo no tienen dígito de control en la MRZ">· sin control</span>' : ""}</td></tr>`).join("")}</table></div>
+      <p class="aviso-info" style="margin:4px 0 0">Nombre, apellidos y sexo no tienen dígito de control, y las letras del soporte solo en parte (no distingue M/W, F/P, G/Q…): hay que contrastarlos con los datos declarados.</p>
+      ${r.correcciones.length ? `<p class="aviso-info" style="margin-bottom:0">Correcciones: ${r.correcciones.map(esc).join(" · ")}</p>` : ""}
+      <p class="aviso-info" style="margin:4px 0 0">Mejor intento: ${esc(m.intento)}</p>`;
+  } else if (!m.error) {
+    html += '<p class="mal">No encontró 3 líneas con forma de MRZ.</p>';
+  }
+  html += `<details><summary class="aviso-info">Texto bruto del OCR</summary>${m.texto_bruto.map((t) =>
+    `<p class="aviso-info" style="margin:6px 0 0">${esc(t.descripcion)}</p><pre>${esc(t.lineas.join("\n")) || "(vacío)"}</pre>`).join("")}</details>`;
+  return html + "</div>";
+}
+
+const CAMPOS_ANVERSO = {
+  dni: "Nº DNI", num_soporte: "Nº soporte", apellidos: "Apellidos", nombre: "Nombre", sexo: "Sexo",
+  nacionalidad: "Nacionalidad", fecha_nacimiento: "Nacimiento", fecha_expedicion: "Emisión",
+  fecha_caducidad: "Validez", can: "CAN",
+};
+
+function bloqueTexto(m) {
+  if (!m.disponible) return `<div class="motor"><h3>${m.motor}</h3><p class="mal">No disponible: ${esc(m.error)}</p></div>`;
+  const t = m.texto;
+  if (!t) return "";
+  let html = `<div class="motor"><h3>${m.motor} <span class="aviso-info">${t.lineas.length} líneas · ${t.ms} ms</span></h3>`;
+  if (t.error) html += `<p class="mal">${esc(t.error)}</p>`;
+  if (!t.lineas.length && !t.error) html += '<p class="mal">No ha detectado ningún texto en la foto.</p>';
+  if (t.lineas.length) {
+    html += `<div class="tabla-scroll"><table class="texto"><tr><th>Texto leído</th><th>Confianza</th></tr>
+      ${t.lineas.map((l, j) => `<tr data-motor="${m.motor}" data-linea="${j}"><td>${esc(l.texto)}</td>
+        <td class="n ${l.confianza != null && l.confianza < 0.7 ? "conf-baja" : ""}">${l.confianza == null ? "—" : Math.round(l.confianza * 100) + " %"}</td></tr>`).join("")}
+    </table></div>
+    <p class="aviso-info" style="margin:4px 0 0">Pasa el ratón por una línea para verla marcada en la foto.</p>`;
+  }
+  return html + "</div>";
+}
+
+function bloqueAnverso(m) {
+  if (!m.disponible || !m.texto?.anverso) return "";
+  const a = m.texto.anverso;
+  const p = a.posicion;
+  const valor = (v) => v == null ? '<span class="aviso-info">—</span>' : esc(v);
+  const filas = Object.entries(CAMPOS_ANVERSO).map(([k, nombre]) => {
+    let v = valor(a.campos[k]);
+    if (k === "dni" && a.campos.dni) v += a.dni_valido ? ' <span class="ok">✔</span>' : ' <span class="mal" title="la letra no cuadra">✘</span>';
+    const o = a.origen[k] && k !== "dni" ? ` <span class="aviso-info">· ${esc(a.origen[k])}</span>` : "";
+    let celdaP = "";
+    if (p) {
+      let vp = valor(p.campos[k]);
+      if (k === "dni" && p.campos.dni) vp += p.dni_valido ? ' <span class="ok">✔</span>' : ' <span class="mal" title="la letra no cuadra">✘</span>';
+      const distinto = p.campos[k] != null && a.campos[k] != null && p.campos[k] !== a.campos[k];
+      const crudo = p.textos[k] != null ? ` title="Leído en la zona: ${esc(p.textos[k] || "(nada)")}"` : "";
+      celdaP = `<td${crudo} class="${distinto ? "dudoso" : ""}">${vp}${k in p.campos ? "" : ' <span class="aviso-info">sin zona</span>'}</td>`;
+    }
+    return `<tr><th>${nombre}</th><td>${v}${o}</td>${celdaP}</tr>`;
+  }).join("");
+  const total = Object.keys(CAMPOS_ANVERSO).length;
+  return `<div class="motor"><h3>${m.motor} ${a.dni_valido || p?.dni_valido ? '<span class="ok">✔</span>' : '<span class="mal">✘</span>'}
+      <span class="aviso-info">etiqueta: ${a.encontrados}/${total}${p ? ` · posición: ${p.encontrados}/${Object.keys(p.campos).length} (${p.ms} ms)` : ""}</span></h3>
+    <div class="tabla-scroll"><table><tr><th>Campo</th><th>Por etiqueta</th>${p ? "<th>Por posición</th>" : ""}</tr>${filas}</table></div>
+    ${p ? '<p class="aviso-info" style="margin:4px 0 0">Pasa el ratón por un valor «por posición» para ver el texto leído en la zona. En naranja, si no coincide con el leído por etiqueta.</p>' : ""}
+    <p class="aviso-info" style="margin:4px 0 0">Etiquetas reconocidas: ${a.etiquetas.length ? a.etiquetas.map(esc).join(", ") : "ninguna"}</p></div>`;
+}
+
+function bloquePlantilla(d) {
+  const pl = d.plantilla;
+  if (!pl) return "";
+  const g = pl.geometria;
+  const prop = pl.propuesta && Object.keys(pl.propuesta).length ? pl.propuesta : null;
+  return `<h3>Plantilla de posiciones</h3>
+    <div class="imagenes">
+      <div>${d.tarjeta_zonas ? `<img src="${d.tarjeta_zonas}" alt="Tarjeta enderezada con las zonas">
+        <div class="leyenda">Tarjeta enderezada · Morado: zonas de la plantilla (lo que se lee por posición) · Verde: dónde están los campos en esta foto · Naranja: etiquetas impresas</div>`
+        : `<p class="mal">${esc(pl.aviso || "No se pudo situar la tarjeta.")}</p>`}</div>
+      <div>
+        ${g ? `<p style="margin-top:0">Tarjeta situada por: <strong>${esc(g.metodo)}</strong>${g.girada ? " (estaba boca abajo)" : ""}
+          ${g.error_anclas != null ? `<br><span class="aviso-info">Desvío de los campos respecto a la plantilla: ${g.error_anclas}</span>` : ""}</p>
+          ${g.notas.map((n) => `<p class="dudoso">${esc(n)}</p>`).join("")}` : ""}
+        ${pl.hay ? "" : '<p class="dudoso">Aún no hay plantilla: se lee solo por etiqueta.</p>'}
+        ${prop ? `<button class="aprender primario">Aprender posiciones de esta foto</button>
+          <p class="aviso-info">Guarda dónde están ${Object.keys(prop).filter((c) => !c.startsWith("etiqueta.")).length} campos (${Object.keys(prop).filter((c) => !c.startsWith("etiqueta.")).map((c) => CAMPOS_ANVERSO[c] || c).join(", ")}) y ${Object.keys(prop).filter((c) => c.startsWith("etiqueta.")).length} etiquetas impresas (las zonas de nombres y apellidos van de su etiqueta a la siguiente, para que quepan una o dos líneas).
+          Solo coordenadas relativas a la tarjeta: ni la foto ni los datos. Hazlo con fotos bien leídas (DNI con ✔); con varias se promedia.</p>`
+          : (g ? '<p class="aviso-info">Para aprender posiciones hace falta ver los bordes de la tarjeta (o una foto recortada a la tarjeta).</p>' : "")}
+        <span class="estado-plantilla aviso-info"></span>
+      </div>
+    </div>`;
+}
+
+function svgCajas(d, motor) {
+  const m = d.motores.find((x) => x.motor === motor);
+  const lineas = m?.texto?.lineas || [];
+  return `<svg viewBox="0 0 ${d.dimensiones.ancho} ${d.dimensiones.alto}" preserveAspectRatio="none">
+    ${lineas.map((l, j) => l.caja ? `<rect data-linea="${j}" x="${l.caja[0]}" y="${l.caja[1]}" width="${l.caja[2]}" height="${l.caja[3]}"></rect>` : "").join("")}
+  </svg>`;
+}
+
+function pintarResultado(d) {
+  const el = document.createElement("details");
+  el.className = "res";
+  el.open = true;
+  const v = d.calidad.veredicto;
+  const conTexto = d.motores.filter((m) => m.texto);
+  const verAnverso = d.lado === "anverso" || d.lado_pedido === "anverso";
+  const verMrz = d.lado_pedido !== "anverso" && d.lado !== "anverso";
+  const cajasDe = conTexto[0]?.motor;
+  el.innerHTML = `
+    <summary>
+      <span class="nombre">${esc(d.archivo)}</span>
+      <span class="badge lado">${LADO[d.lado] || d.lado}${d.lado_pedido === "auto" ? " (detectado)" : ""}</span>
+      <span class="badge b-${v}">${VEREDICTO[v]}</span>
+      ${d.motores.map((m) => `<span class="chip">${m.motor} ${iconoMotor(d, m)}</span>`).join("")}
+      <span class="aviso-info">${d.dimensiones.ancho}×${d.dimensiones.alto}</span>
+    </summary>
+    <div class="cuerpo">
+      <div class="imagenes">
+        <div>
+          ${conTexto.length ? `<div class="fila cajas-motor" style="margin-bottom:6px">Cajas del texto detectado:
+            ${conTexto.map((m) => `<button data-cajas="${m.motor}" class="${m.motor === cajasDe ? "activo" : ""}">${m.motor}</button>`).join("")}
+            <button data-cajas="">ninguna</button></div>` : ""}
+          <div class="foto"><img src="${d.imagen_anotada}" alt="Foto analizada">${cajasDe ? svgCajas(d, cajasDe) : ""}</div>
+          <div class="leyenda">Azul: texto detectado por el OCR · Verde: MRZ localizada · Rojo: reflejos</div></div>
+        <div>${d.recorte_mrz ? `<img src="${d.recorte_mrz}" alt="Recorte de la MRZ"><div class="leyenda">Recorte de la MRZ</div>`
+          : (verMrz ? '<p class="aviso-info">No se localizó la MRZ con OpenCV (RapidOCR lo intenta además con la foto entera).</p>' : "")}
+          <h3>Calidad</h3>${tablaCalidad(d.calidad)}</div>
+      </div>
+      ${conTexto.length ? `<h3>Texto detectado por el OCR (foto entera)</h3>
+        <div class="motores">${d.motores.filter((m) => m.motor !== "combinado").map(bloqueTexto).join("")}</div>` : ""}
+      ${verAnverso ? `<h3>Campos del anverso</h3>
+        <p class="aviso-info" style="margin-top:0">Solo el nº de DNI tiene control (la letra). El resto se deduce por la posición junto a su etiqueta: contrástalo con el reverso o con lo declarado.</p>
+        <div class="motores">${d.motores.map(bloqueAnverso).join("")}</div>
+        ${bloquePlantilla(d)}` : ""}
+      ${verMrz ? `<h3>Lectura de la MRZ (reverso)</h3>
+        <div class="motores">${d.motores.map(bloqueMotor).join("")}</div>` : ""}
+    </div>`;
+
+  el.querySelector("button.aprender")?.addEventListener("click", async (ev) => {
+    const b = ev.currentTarget;
+    b.disabled = true;
+    const estado = el.querySelector(".estado-plantilla");
+    try {
+      const resp = await fetch("/api/plantilla", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campos: d.plantilla.propuesta }) });
+      const datos = await resp.json();
+      if (!resp.ok) throw new Error(datos.detail || resp.statusText);
+      estado.textContent = "Guardado. Vuelve a analizar fotos para leerlas por posición.";
+      cargarEstado();
+    } catch (e) {
+      estado.textContent = `Error: ${e.message}`;
+      b.disabled = false;
+    }
+  });
+
+  const foto = el.querySelector(".foto");
+  let motorCajas = cajasDe;
+  el.querySelectorAll("[data-cajas]").forEach((b) => b.addEventListener("click", () => {
+    motorCajas = b.dataset.cajas;
+    el.querySelectorAll("[data-cajas]").forEach((x) => x.classList.toggle("activo", x === b));
+    foto.querySelector("svg")?.remove();
+    if (motorCajas) foto.insertAdjacentHTML("beforeend", svgCajas(d, motorCajas));
+  }));
+  // Resaltar en la foto la línea sobre la que está el ratón.
+  el.querySelectorAll("table.texto tr[data-linea]").forEach((tr) => {
+    tr.addEventListener("mouseenter", () => {
+      if (tr.dataset.motor !== motorCajas) el.querySelector(`[data-cajas="${tr.dataset.motor}"]`)?.click();
+      foto.querySelector(`rect[data-linea="${tr.dataset.linea}"]`)?.classList.add("activa");
+    });
+    tr.addEventListener("mouseleave", () => foto.querySelectorAll("rect.activa").forEach((x) => x.classList.remove("activa")));
+  });
+  $("#resultados").prepend(el);
+}
+
+function pct(a, b) { return b ? Math.round((a / b) * 100) + " %" : "—"; }
+
+function pintarResumen() {
+  if (!resultados.length) { $("#resumen").hidden = true; return; }
+  $("#resumen").hidden = false;
+  const nombres = [...new Set(resultados.flatMap((r) => r.motores.filter((m) => m.disponible).map((m) => m.motor)))];
+  const valido = (r, n) => lecturaOk(r, r.motores.find((m) => m.motor === n));
+  const algunValido = (r) => nombres.some((n) => valido(r, n));
+
+  const filasMotor = nombres.map((n) => {
+    const conM = resultados.filter((r) => r.motores.some((m) => m.motor === n && m.disponible));
+    const ok = conM.filter((r) => valido(r, n)).length;
+    const corr = conM.filter((r) => { const m = r.motores.find((x) => x.motor === n); return r.lado !== "anverso" && m?.mrz?.valido && m.mrz.correcciones.length; }).length;
+    const ms = conM.map((r) => { const m = r.motores.find((x) => x.motor === n); return r.lado === "anverso" ? (m.texto?.ms ?? 0) : m.ms; });
+    const medio = ms.length ? Math.round(ms.reduce((a, b) => a + b, 0) / ms.length) : 0;
+    return `<tr><td>${n}</td><td class="n">${ok} / ${conM.length}</td><td class="n"><strong>${pct(ok, conM.length)}</strong></td>
+      <td class="n">${corr}</td><td class="n">${medio} ms</td></tr>`;
+  }).join("");
+
+  const veredictos = ["apta", "riesgo", "rechazar"];
+  const filasVer = veredictos.map((v) => {
+    const g = resultados.filter((r) => r.calidad.veredicto === v);
+    return `<tr><td><span class="badge b-${v}">${VEREDICTO[v]}</span></td><td class="n">${g.length}</td>
+      ${nombres.map((n) => `<td class="n">${pct(g.filter((r) => valido(r, n)).length, g.length)}</td>`).join("")}
+      <td class="n">${pct(g.filter(algunValido).length, g.length)}</td></tr>`;
+  }).join("");
+
+  const avisos = {};
+  for (const r of resultados) {
+    for (const a of r.calidad.avisos) {
+      const k = `${a.zona === "mrz" ? "MRZ" : "Foto"} · ${NOMBRES[a.metrica] || a.metrica} · ${a.nivel}`;
+      (avisos[k] ||= new Set()).add(r);
+    }
+  }
+  const filasAviso = Object.entries(avisos).sort((a, b) => b[1].size - a[1].size).map(([k, s]) => {
+    const lista = [...s];
+    return `<tr><td>${esc(k)}</td><td class="n">${lista.length}</td><td class="n">${pct(lista.filter(algunValido).length, lista.length)}</td></tr>`;
+  }).join("");
+
+  $("#resumen-cuerpo").innerHTML = `
+    <div class="tabla-scroll"><table>
+      <tr><th>Motor</th><th>Lecturas válidas</th><th>Acierto</th><th>MRZ válidas tras corregir</th><th>Tiempo medio</th></tr>${filasMotor}
+    </table></div>
+    <p class="aviso-info">Lectura válida: en el reverso, MRZ con todos los dígitos de control; en el anverso, nº de DNI con la letra correcta.
+      Fotos: ${["reverso", "anverso", "desconocido"].map((l) => `${LADO[l]} ${resultados.filter((r) => r.lado === l).length}`).join(" · ")}.</p>
+    <h3>Calidad × lectura</h3>
+    <p class="aviso-info" style="margin-top:0">Si las fotos «Rechazar» se leen bien igualmente, los umbrales son demasiado estrictos; si las «Apta» fallan, demasiado laxos.</p>
+    <div class="tabla-scroll"><table>
+      <tr><th>Veredicto de calidad</th><th>Fotos</th>${nombres.map((n) => `<th>${n}</th>`).join("")}<th>Algún motor</th></tr>${filasVer}
+    </table></div>
+    ${filasAviso ? `<h3>Por aviso</h3><div class="tabla-scroll"><table>
+      <tr><th>Aviso</th><th>Fotos</th><th>Leídas por algún motor</th></tr>${filasAviso}</table></div>` : ""}`;
+}
+
+function descargarCSV() {
+  const nombres = [...new Set(resultados.flatMap((r) => r.motores.map((m) => m.motor)))];
+  const metricas = [...new Set(resultados.flatMap((r) =>
+    Object.entries(r.calidad.zonas).flatMap(([z, ms]) => Object.keys(ms).map((k) => `${z}.${k}`))))];
+  const cab = ["archivo", "lado", "ancho", "alto", "mrz_localizada", "veredicto", "avisos",
+    ...metricas, ...nombres.flatMap((n) => [`${n}.valido`, `${n}.ms`, `${n}.correcciones`, `${n}.error`,
+      `${n}.anverso_dni_valido`, `${n}.anverso_campos`, `${n}.posicion_dni_valido`, `${n}.posicion_campos`])];
+  const filas = resultados.map((r) => [
+    r.archivo, r.lado, r.dimensiones.ancho, r.dimensiones.alto, r.caja_mrz ? "si" : "no", r.calidad.veredicto,
+    r.calidad.avisos.map((a) => `${a.zona}.${a.metrica}:${a.nivel}`).join(" | "),
+    ...metricas.map((k) => { const [z, m] = k.split("."); return r.calidad.zonas[z]?.[m]?.valor ?? ""; }),
+    ...nombres.flatMap((n) => {
+      const m = r.motores.find((x) => x.motor === n);
+      if (!m) return ["", "", "", "", "", "", "", ""];
+      const a = m.texto?.anverso;
+      return [m.mrz?.valido ? "si" : "no", m.ms ?? "", m.mrz?.correcciones.length ?? "", m.error ?? "",
+        a ? (a.dni_valido ? "si" : "no") : "", a ? a.encontrados : "",
+        a?.posicion ? (a.posicion.dni_valido ? "si" : "no") : "", a?.posicion ? a.posicion.encontrados : ""];
+    }),
+  ]);
+  // Sin datos personales (DNI, nombre, fechas): el CSV solo lleva métricas y aciertos.
+  const csv = [cab, ...filas].map((f) => f.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+  const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: "mrz-lab-resultados.csv" });
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+const zona = $("#zona"), entrada = $("#entrada");
+zona.addEventListener("click", () => entrada.click());
+zona.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") entrada.click(); });
+entrada.addEventListener("change", () => { procesar(entrada.files); entrada.value = ""; });
+zona.addEventListener("dragover", (e) => { e.preventDefault(); zona.classList.add("encima"); });
+zona.addEventListener("dragleave", () => zona.classList.remove("encima"));
+zona.addEventListener("drop", (e) => { e.preventDefault(); zona.classList.remove("encima"); procesar(e.dataTransfer.files); });
+$("#csv").addEventListener("click", descargarCSV);
+$("#muestras").addEventListener("click", async () => {
+  const nombres = await fetch("/api/muestras").then((r) => r.json());
+  const archivos = await Promise.all(nombres.map(async (n) =>
+    new File([await fetch(`/api/muestras/${n}.jpg`).then((r) => r.blob())], `sintetica-${n}.jpg`, { type: "image/jpeg" })));
+  procesar(archivos);
+});
+$("#limpiar").addEventListener("click", () => {
+  resultados = []; $("#resultados").innerHTML = ""; pintarResumen();
+  $("#estado").textContent = ""; $("#csv").disabled = $("#limpiar").disabled = true;
+});
+cargarEstado();
+</script>
+</body>
+</html>

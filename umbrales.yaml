@@ -1,0 +1,30 @@
+# Umbrales de calidad de imagen. Valores INICIALES: hay que calibrarlos con fotos reales
+# usando el resumen por lotes de la página (cruce calidad × MRZ válida).
+#
+# Cada métrica tiene un sentido:
+#   min → es malo que el valor quede POR DEBAJO (p. ej. nitidez)
+#   max → es malo que el valor quede POR ENCIMA (p. ej. reflejo)
+# «dudoso» marca aviso amarillo; «mal» marca aviso rojo.
+#
+# Se evalúan dos zonas: la foto entera («global») y solo la MRZ («mrz»).
+# En la zona global el peor nivel posible es «dudoso» para las métricas marcadas con
+# solo_aviso: true (el fondo de la foto no impide leer la MRZ).
+
+global:
+  nitidez:        {sentido: min, dudoso: 60,   mal: 25}    # var. del Laplaciano, foto a 1000 px de ancho
+  brillo_bajo:    {sentido: min, dudoso: 70,   mal: 45}    # media de gris 0-255
+  brillo_alto:    {sentido: max, dudoso: 200,  mal: 225}
+  oscuros:        {sentido: max, dudoso: 0.40, mal: 0.65,  solo_aviso: true}  # fracción de píxeles < 30
+  quemados:       {sentido: max, dudoso: 0.08, mal: 0.20}  # fracción de píxeles > 250
+  contraste:      {sentido: min, dudoso: 35,   mal: 20}    # desviación típica del gris
+  reflejo:        {sentido: max, dudoso: 0.004, mal: 0.015, solo_aviso: true}  # mayor mancha blanca / área
+  lado_min_px:    {sentido: min, dudoso: 900,  mal: 600}   # lado corto de la foto
+
+mrz:
+  nitidez:        {sentido: min, dudoso: 500,  mal: 200}   # var. del Laplaciano, MRZ a 900 px de ancho
+  brillo_bajo:    {sentido: min, dudoso: 90,   mal: 60}
+  brillo_alto:    {sentido: max, dudoso: 235,  mal: 248}
+  quemados:       {sentido: max, dudoso: 0.10, mal: 0.25}
+  contraste:      {sentido: min, dudoso: 40,   mal: 25}
+  reflejo:        {sentido: max, dudoso: 0.01, mal: 0.04}
+  altura_linea_px: {sentido: min, dudoso: 26,  mal: 16}    # alto de cada línea de la MRZ en la foto original

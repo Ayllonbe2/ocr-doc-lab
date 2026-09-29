@@ -1,0 +1,12 @@
+fotos/
+tessdata/
+**/__pycache__
+.pytest_cache
+.venv
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.heic
+*.csv
+resultados/

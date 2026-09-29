@@ -1,0 +1,15 @@
+services:
+  mrz-lab:
+    build: .
+    image: mrz-lab:local
+    # Solo accesible desde este ordenador.
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # Umbrales editables sin reconstruir (se releen en cada análisis).
+      - ./umbrales.yaml:/app/umbrales.yaml:ro
+      # Plantilla de posiciones del anverso (solo coordenadas): se escribe al aprender.
+      - ./plantillas:/app/plantillas
+    read_only: true
+    tmpfs:
+      - /tmp

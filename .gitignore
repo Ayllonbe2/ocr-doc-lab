@@ -1,0 +1,14 @@
+# Nunca subir fotos de DNI al repositorio.
+fotos/
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.heic
+*.csv
+# Modelo de Tesseract descargado (se baja en el Dockerfile o con el script del README).
+tessdata/
+__pycache__/
+.pytest_cache/
+.venv/
+resultados/
