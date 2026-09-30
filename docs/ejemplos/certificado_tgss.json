@@ -1,0 +1,87 @@
+{
+  "tipo": "certificado_tgss",
+  "lectura": "COMPLETA",
+  "origen": "pdf_digital",
+  "paginas": 1,
+  "campos": {
+    "razon_social": {
+      "valor": "CONSTRUCCIONES EJEMPLO SL",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "identificador": {
+      "valor": "B60233970",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "fecha_emision": {
+      "valor": "2026-08-06",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "al_corriente": {
+      "valor": true,
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "codigo_verificacion": {
+      "valor": "9CE5CFF7MJFQU3V9",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "caduca": {
+      "valor": "2027-02-06",
+      "origen": "calculado",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "validez_meses": {
+      "valor": 6,
+      "origen": "por_defecto",
+      "confianza": 1.0,
+      "pagina": 1
+    }
+  },
+  "validaciones": {
+    "identificador_valido": true,
+    "vigente": true,
+    "al_corriente": true
+  },
+  "clasificacion": {
+    "tipo_detectado": "certificado_tgss",
+    "confianza": 0.65,
+    "candidatos": [
+      {
+        "tipo": "certificado_tgss",
+        "puntos": 7.5
+      },
+      {
+        "tipo": "certificado_aeat",
+        "puntos": 3
+      }
+    ],
+    "coincide": true
+  },
+  "autenticidad": {
+    "firmas": [],
+    "codigos_verificacion": [
+      {
+        "tipo": "CSV",
+        "codigo": "9CE5CFF7MJFQU3V9"
+      }
+    ],
+    "qr": [],
+    "avisos": []
+  },
+  "calidad": {
+    "veredicto": "apta",
+    "avisos": []
+  },
+  "avisos": [],
+  "tiempo_ms": 0
+}

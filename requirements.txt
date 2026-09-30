@@ -8,3 +8,9 @@ PyYAML==6.0.3
 pytesseract==0.3.13
 rapidocr-onnxruntime==1.4.4
 onnxruntime==1.30.0
+# PDF: texto con posiciones, render y firmas (licencias MIT / BSD / Apache; nada AGPL).
+pdfplumber==0.11.10
+pypdfium2==5.13.0
+pyHanko==0.37.0
+# Documentos sintéticos del lab y de los tests (BSD).
+reportlab==5.0.1

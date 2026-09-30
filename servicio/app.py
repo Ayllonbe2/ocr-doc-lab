@@ -14,8 +14,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from mrzlab import motores
+from mrzlab.extractores import REGISTRO
 
 from .api import router
+from .documentos import router as router_documentos
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,7 +47,9 @@ async def exigir_api_key(request: Request, call_next):
 @app.get("/health")
 def health():
     return {"status": "ok",
-            "motores": {m.nombre: m.disponible()[0] for m in motores.TODOS}}
+            "motores": {m.nombre: m.disponible()[0] for m in motores.TODOS},
+            "tipos_documento": len(REGISTRO)}
 
 
 app.include_router(router)
+app.include_router(router_documentos)

@@ -1,0 +1,61 @@
+{
+  "tipo": "reconocimiento_medico",
+  "lectura": "COMPLETA",
+  "origen": "pdf_digital",
+  "paginas": 1,
+  "campos": {
+    "nif": {
+      "valor": "29289087J",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "fecha": {
+      "valor": "2026-06-20",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "apto": {
+      "valor": "APTO",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    }
+  },
+  "validaciones": {
+    "apto": true,
+    "fecha_no_futura": true
+  },
+  "clasificacion": {
+    "tipo_detectado": "reconocimiento_medico",
+    "confianza": 0.87,
+    "candidatos": [
+      {
+        "tipo": "reconocimiento_medico",
+        "puntos": 13.0
+      },
+      {
+        "tipo": "evaluacion_riesgos",
+        "puntos": 1
+      },
+      {
+        "tipo": "contrato_laboral",
+        "puntos": 1
+      }
+    ],
+    "coincide": true
+  },
+  "autenticidad": {
+    "firmas": [],
+    "codigos_verificacion": [],
+    "qr": [],
+    "avisos": []
+  },
+  "calidad": {
+    "veredicto": "apta",
+    "avisos": []
+  },
+  "avisos": [],
+  "tiempo_ms": 0
+}

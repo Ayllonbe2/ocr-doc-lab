@@ -1,0 +1,80 @@
+{
+  "tipo": "ts_riesgos",
+  "lectura": "COMPLETA",
+  "origen": "pdf_digital",
+  "paginas": 1,
+  "campos": {
+    "titular": {
+      "valor": "JAVIER CASTRO GOMEZ",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "nif": {
+      "valor": "29289087J",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "fecha": {
+      "valor": "2020-10-13",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "titulo": {
+      "valor": "TECNICO SUPERIOR EN PREVENCION DE RIESGOS PROFESIONALES",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "comunidad_autonoma": {
+      "valor": "COMUNIDAD DE MADRID",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "numero_registro": {
+      "valor": "819519487096",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    }
+  },
+  "validaciones": {
+    "nif_letra_valida": true,
+    "titulo_prevencion_riesgos": true,
+    "fecha_no_futura": true
+  },
+  "clasificacion": {
+    "tipo_detectado": "ts_riesgos",
+    "confianza": 0.72,
+    "candidatos": [
+      {
+        "tipo": "ts_riesgos",
+        "puntos": 6.5
+      },
+      {
+        "tipo": "formacion_art19",
+        "puntos": 1.5
+      },
+      {
+        "tipo": "flc_60h",
+        "puntos": 0.5
+      }
+    ],
+    "coincide": true
+  },
+  "autenticidad": {
+    "firmas": [],
+    "codigos_verificacion": [],
+    "qr": [],
+    "avisos": []
+  },
+  "calidad": {
+    "veredicto": "apta",
+    "avisos": []
+  },
+  "avisos": [],
+  "tiempo_ms": 0
+}

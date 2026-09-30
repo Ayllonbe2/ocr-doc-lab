@@ -1,0 +1,62 @@
+{
+  "tipo": "apertura_centro_trabajo",
+  "lectura": "COMPLETA",
+  "origen": "pdf_digital",
+  "paginas": 1,
+  "campos": {
+    "razon_social": {
+      "valor": "CONSTRUCCIONES EJEMPLO SL",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "identificador": {
+      "valor": "B60233970",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "direccion_obra": {
+      "valor": "CALLE FICTICIA 98, MADRID",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "fecha": {
+      "valor": "2026-03-31",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    }
+  },
+  "validaciones": {
+    "identificador_valido": true
+  },
+  "clasificacion": {
+    "tipo_detectado": "apertura_centro_trabajo",
+    "confianza": 0.87,
+    "candidatos": [
+      {
+        "tipo": "apertura_centro_trabajo",
+        "puntos": 10.0
+      },
+      {
+        "tipo": "plan_seguridad_salud",
+        "puntos": 0.5
+      }
+    ],
+    "coincide": true
+  },
+  "autenticidad": {
+    "firmas": [],
+    "codigos_verificacion": [],
+    "qr": [],
+    "avisos": []
+  },
+  "calidad": {
+    "veredicto": "apta",
+    "avisos": []
+  },
+  "avisos": [],
+  "tiempo_ms": 0
+}

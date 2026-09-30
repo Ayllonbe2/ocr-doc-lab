@@ -1,0 +1,58 @@
+{
+  "tipo": "cae_documentacion",
+  "lectura": "COMPLETA",
+  "origen": "pdf_digital",
+  "paginas": 2,
+  "campos": {
+    "razon_social": {
+      "valor": "CONSTRUCCIONES EJEMPLO SL",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "identificador": {
+      "valor": "B60233970",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "fecha": {
+      "valor": "2025-12-29",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    }
+  },
+  "validaciones": {},
+  "clasificacion": {
+    "tipo_detectado": "cae_documentacion",
+    "confianza": 0.73,
+    "candidatos": [
+      {
+        "tipo": "cae_documentacion",
+        "puntos": 8
+      },
+      {
+        "tipo": "apertura_centro_trabajo",
+        "puntos": 2
+      },
+      {
+        "tipo": "contrato_laboral",
+        "puntos": 1
+      }
+    ],
+    "coincide": true
+  },
+  "autenticidad": {
+    "firmas": [],
+    "codigos_verificacion": [],
+    "qr": [],
+    "avisos": []
+  },
+  "calidad": {
+    "veredicto": "apta",
+    "avisos": []
+  },
+  "avisos": [],
+  "tiempo_ms": 0
+}

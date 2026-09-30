@@ -25,6 +25,7 @@ RUN mkdir -p /opt/tessdata  && if [ "$INCLUIR_MODELO_MRZ_AGPL" = "true" ]; then 
 COPY umbrales.yaml .
 COPY mrzlab ./mrzlab
 COPY servicio ./servicio
+COPY herramientas ./herramientas
 COPY plantillas ./plantillas
 
 # Todos los modelos quedan dentro de la imagen: en ejecución no se descarga nada.

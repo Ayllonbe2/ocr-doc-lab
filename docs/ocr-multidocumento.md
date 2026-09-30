@@ -4,7 +4,7 @@ Propuesta para llevar lo que hace el lab con el DNI a **otros documentos** (titu
 certificados, pólizas…) y servirlo como un **servicio OCR propio, sin nube y solo en localhost**, con un endpoint por
 tipo de documento.
 
-Estado: propuesta, sin implementar.
+Estado: implementado (16 tipos de documento). Qué falta y cómo se ha medido: [Roadmap](roadmap.md).
 
 ## Por qué
 
@@ -20,42 +20,45 @@ Estado: propuesta, sin implementar.
 
 ### Núcleo común
 
-Lo que ya existe en `mrzlab/`, sin cambios de fondo:
-
 | Pieza | Módulo |
 |---|---|
 | Motores OCR (Tesseract, RapidOCR) detrás de una interfaz común | `motores.py` |
-| Calidad de la imagen (nitidez, luz, reflejos, resolución) | `calidad.py` |
-| Enderezado de la tarjeta, contraste local | `preproceso.py` |
-| Plantilla de posiciones (dónde está cada campo) | `plantilla.py` |
-
-A añadir:
+| Calidad de la imagen (nitidez, luz, reflejos, resolución; y para A4, alto de la letra) | `calidad.py` |
+| PDF: capa de texto y render (PDFium), formularios sin aplanar (pdfplumber) | `pdf.py` |
+| Hoja en la foto, orientación e inclinación | `pagina.py` |
+| OCR de páginas: Tesseract; en fotos, detección de RapidOCR y relectura por línea | `ocr_documento.py` |
+| Leer un documento y extraer los campos de un tipo | `documentos.py` |
+| NIF/NIE/CIF, fechas, importes | `validadores.py` |
+| Firma PAdES, CSV/CEA, QR, metadatos | `autenticidad.py` |
+| Qué tipo de documento es | `clasificador.py` |
 
 - **Entrada de PDF.** Si el PDF es digital (tiene capa de texto), se lee el texto directamente,
   sin OCR: es más rápido y no tiene errores de lectura. Solo los PDF escaneados y las fotos pasan
-  por el OCR. En certificados y titulaciones lo habitual es lo primero.
-- **Resultado común:** `{tipo, campos, validaciones, calidad, avisos}`. Cada campo lleva de dónde
-  sale (etiqueta, posición, capa de texto) para poder medir y depurar.
+  por el OCR. Se decide por página.
+- **Resultado común:** `{tipo, lectura, origen, campos, validaciones, clasificacion, autenticidad,
+  calidad, avisos}`. Cada campo lleva de dónde sale (`capa_texto`, `formulario`, `ocr:<motor>`) y
+  su confianza.
 
 ### Un extractor por tipo de documento
 
-Cada tipo es una pieza independiente con la misma interfaz:
+Cada tipo es una pieza independiente con la misma interfaz (`mrzlab/extractores/base.py`):
 
 ```python
 class Extractor:
     tipo = "flc_60h"                        # identificador del endpoint
-    campos = ("titular", "nif", "horas", "entidad", "fecha")
+    campos = ("titular", "nif", "horas", "numero_registro", "numero_curso", "entidad", "fecha")
+    obligatorios = ("titular", "nif", "horas", "fecha")
+    claves = {r"FUNDACION LABORAL DE LA CONSTRUCCION": 3, ...}   # para el clasificador
 
-    def extraer(self, lineas, imagen) -> Resultado:
-        """Campos a partir de las líneas del OCR (texto + caja) o de la capa de texto del PDF."""
+    def extraer(self, doc) -> dict[str, Campo]:
+        """Campos a partir de las líneas (texto + caja + origen), vengan del PDF o del OCR."""
 
-    def validar(self, campos) -> dict[str, bool]:
-        """Comprobaciones propias del documento (letra del NIF, fechas coherentes, horas mínimas…)."""
+    def validar(self, campos, doc) -> dict[str, bool | None]:
+        """Comprobaciones propias del documento (letra del NIF, horas mínimas, vigencia…)."""
 ```
 
-Ejemplos: `dni` (ya existe: MRZ y anverso), certificados de formación, titulaciones oficiales,
-pólizas de seguro, certificados de empresa. Añadir un documento nuevo es añadir un extractor y sus
-casos de prueba; el resto no cambia.
+Añadir un documento nuevo es añadir un extractor, su plantilla sintética
+(`sintetico_docs.py`) y sus pruebas; el resto no cambia.
 
 ### Endpoints
 
@@ -65,6 +68,7 @@ Con versión desde el principio, para poder cambiar el contrato sin romper a nad
 |---|---|---|
 | `GET` | `/v1/documentos/tipos` | Tipos admitidos y los campos de cada uno |
 | `POST` | `/v1/documentos/{tipo}/extraer` | Extrae los campos de un documento (imagen o PDF) |
+| `POST` | `/v1/documentos/clasificar` | Qué tipo de documento es |
 | `POST` | `/v1/dni/verificar` | Flujo completo del DNI: anverso + reverso + DNI declarado → verificado / repetir / revisión manual |
 | `GET` | `/health` | Estado del servicio y de los motores |
 

@@ -1,0 +1,66 @@
+{
+  "tipo": "formacion_art19",
+  "lectura": "COMPLETA",
+  "origen": "pdf_digital",
+  "paginas": 1,
+  "campos": {
+    "nombre_trabajador": {
+      "valor": "JAVIER CASTRO GOMEZ",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "nif_trabajador": {
+      "valor": "29289087J",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "fecha": {
+      "valor": "2026-06-24",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "firmado": {
+      "valor": true,
+      "origen": "imagen",
+      "confianza": 0.69,
+      "pagina": 1
+    }
+  },
+  "validaciones": {
+    "firmado": true
+  },
+  "clasificacion": {
+    "tipo_detectado": "formacion_art19",
+    "confianza": 0.61,
+    "candidatos": [
+      {
+        "tipo": "formacion_art19",
+        "puntos": 5.5
+      },
+      {
+        "tipo": "informacion_art18",
+        "puntos": 2.5
+      },
+      {
+        "tipo": "ts_prl",
+        "puntos": 2
+      }
+    ],
+    "coincide": true
+  },
+  "autenticidad": {
+    "firmas": [],
+    "codigos_verificacion": [],
+    "qr": [],
+    "avisos": []
+  },
+  "calidad": {
+    "veredicto": "apta",
+    "avisos": []
+  },
+  "avisos": [],
+  "tiempo_ms": 0
+}

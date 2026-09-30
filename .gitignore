@@ -12,3 +12,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 resultados/
+# Documentos de prueba (reales o descargados) y su verdad.csv: nunca al repositorio.
+datos/
+*.pdf
+!tests/**/*.pdf

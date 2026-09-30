@@ -1,0 +1,39 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Con el modelo «mrz» (como el lab): las pruebas del DNI se calibraron con él.
+      - name: Imagen del servicio
+        run: docker build -t ocr-doc-lab:ci .
+
+      - name: Imagen de pruebas (dependencias de desarrollo)
+        run: |
+          grep -v '^-r' requirements-dev.txt > dev.txt
+          printf 'FROM ocr-doc-lab:ci\nUSER root\nCOPY dev.txt /tmp/\nRUN pip install --no-cache-dir -r /tmp/dev.txt\n' \
+            | docker build -t ocr-doc-lab:pruebas -f - .
+
+      # Sin red: el OCR y todas las pruebas deben funcionar sin ninguna conexión saliente.
+      - name: Pruebas rápidas (sin red)
+        run: >
+          docker run --rm --network none -v "$PWD:/app" -w /app -e PYTHONPATH=/app
+          ocr-doc-lab:pruebas python -m pytest -q -m "not ocr" -p no:cacheprovider
+
+      - name: Pruebas con OCR real sobre escaneos y fotos (sin red)
+        run: >
+          docker run --rm --network none --cpus 2 -v "$PWD:/app" -w /app -e PYTHONPATH=/app
+          ocr-doc-lab:pruebas python -m pytest -q -m ocr -p no:cacheprovider
+
+      - name: Licencias (nada GPL/AGPL en el servicio)
+        run: >
+          docker run --rm --network none ocr-doc-lab:pruebas
+          pip-licenses --fail-on "GNU General Public License v3 (GPLv3);GNU Affero General Public License v3;GNU Affero General Public License v3 or later (AGPLv3+)"

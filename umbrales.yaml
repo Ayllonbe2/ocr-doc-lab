@@ -28,3 +28,14 @@ mrz:
   contraste:      {sentido: min, dudoso: 40,   mal: 25}
   reflejo:        {sentido: max, dudoso: 0.01, mal: 0.04}
   altura_linea_px: {sentido: min, dudoso: 26,  mal: 16}    # alto de cada línea de la MRZ en la foto original
+
+# Páginas de documentos (A4 escaneado o fotografiado) que pasan por OCR. Valores iniciales:
+# calibrar con herramientas/medir.py (cruce calidad × campos leídos).
+documento:
+  nitidez:        {sentido: min, dudoso: 80,   mal: 30}    # var. del Laplaciano, página a 1000 px de ancho
+  brillo_bajo:    {sentido: min, dudoso: 90,   mal: 60}
+  # Sin brillo_alto ni quemados: el papel blanco de un escaneo limpio ya está casi a 255.
+  oscuros:        {sentido: max, dudoso: 0.25, mal: 0.45,  solo_aviso: true}
+  contraste:      {sentido: min, dudoso: 18,   mal: 8}     # una página con poco texto es casi toda blanca
+  reflejo:        {sentido: max, dudoso: 0.01, mal: 0.04}
+  altura_letra_px: {sentido: min, dudoso: 16,  mal: 10}    # mediana del alto de las líneas leídas

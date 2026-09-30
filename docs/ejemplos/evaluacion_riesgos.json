@@ -1,0 +1,50 @@
+{
+  "tipo": "evaluacion_riesgos",
+  "lectura": "COMPLETA",
+  "origen": "pdf_digital",
+  "paginas": 2,
+  "campos": {
+    "razon_social": {
+      "valor": "CONSTRUCCIONES EJEMPLO SL",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "identificador": {
+      "valor": "B60233970",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "fecha": {
+      "valor": "2025-12-29",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    }
+  },
+  "validaciones": {},
+  "clasificacion": {
+    "tipo_detectado": "evaluacion_riesgos",
+    "confianza": 0.88,
+    "candidatos": [
+      {
+        "tipo": "evaluacion_riesgos",
+        "puntos": 7.5
+      }
+    ],
+    "coincide": true
+  },
+  "autenticidad": {
+    "firmas": [],
+    "codigos_verificacion": [],
+    "qr": [],
+    "avisos": []
+  },
+  "calidad": {
+    "veredicto": "apta",
+    "avisos": []
+  },
+  "avisos": [],
+  "tiempo_ms": 0
+}

@@ -113,6 +113,88 @@ def _dibujar_zonas(tarjeta: np.ndarray, zonas: dict, propuesta: dict) -> np.ndar
     return out
 
 
+# ── Documentos (títulos, certificados, pólizas, contratos, fichas…) ──────────
+
+@app.get("/documentos")
+def pagina_documentos():
+    return FileResponse(RAIZ / "static" / "documentos.html")
+
+
+@app.get("/api/documentos/tipos")
+def tipos_documento():
+    from .extractores import REGISTRO
+    return [e.describir() for e in REGISTRO.values()]
+
+
+@app.get("/api/documentos/muestra/{tipo}")
+def muestra_documento(tipo: str, origen: str = "digital", semilla: int = 0, firmada: bool = True):
+    """Documento sintético (datos ficticios): PDF digital, PDF escaneado o foto JPG."""
+    from . import sintetico_docs as sd
+    if tipo not in sd.PLANTILLAS:
+        raise HTTPException(404, "Tipo desconocido")
+    rng = np.random.default_rng(semilla)
+    opciones = {"firmada": firmada} if tipo in ("informacion_art18", "formacion_art19", "entrega_epis") else {}
+    pdf, _ = sd.generar(tipo, rng, **opciones)
+    if origen == "escaneado":
+        return Response(sd.escanear(pdf, rng), media_type="application/pdf")
+    if origen == "foto":
+        return Response(sd.a_jpeg(sd.foto(sd.a_imagen(pdf, 200), rng)), media_type="image/jpeg")
+    return Response(pdf, media_type="application/pdf")
+
+
+def _pagina_anotada(img: np.ndarray, lineas, cajas_campos: set) -> str:
+    """Página con las líneas leídas (azul) y las que dan un campo (verde)."""
+    out = img.copy()
+    h, w = img.shape[:2]
+    grosor = max(1, round(w / 800))
+    for ln in lineas:
+        x, y, cw, ch = ln.caja
+        color = (60, 180, 60) if ln.caja in cajas_campos else (255, 140, 40)
+        cv2.rectangle(out, (int(x * w), int(y * h)), (int((x + cw) * w), int((y + ch) * h)), color, grosor)
+    return _jpeg_b64(out, 1100)
+
+
+@app.post("/api/documentos/analizar")
+async def analizar_documento(archivo: UploadFile = File(...), tipo: str = Form(...)):
+    from . import documentos
+    from .extractores import REGISTRO
+    if tipo not in REGISTRO:
+        raise HTTPException(404, "Tipo desconocido")
+    datos = await archivo.read()
+    if len(datos) > MAX_BYTES:
+        raise HTTPException(413, "Documento demasiado grande (máx. 25 MB)")
+    try:
+        resultado, doc = documentos.procesar_con_documento(datos, tipo)
+    except documentos.DocumentoInvalido as e:
+        raise HTTPException(415 if e.motivo == "formato" else 400, str(e))
+    finally:
+        del datos
+    salida = resultado.a_dict()
+    cajas_campos = {c.caja for c in resultado.campos.values() if c.caja}
+    for nombre, c in resultado.campos.items():
+        salida["campos"][nombre]["caja"] = c.caja
+    paginas = []
+    for p in doc.paginas:
+        try:
+            img = doc.imagen(p.numero)
+        except Exception:
+            img = None
+        paginas.append({
+            "numero": p.numero, "tipo": p.tipo, "motor": p.motor, "calidad": p.calidad,
+            "imagen": _pagina_anotada(img, [ln for ln in doc.lineas if ln.pagina == p.numero], cajas_campos)
+            if img is not None else None,
+        })
+    salida["lab"] = {
+        "archivo": archivo.filename,
+        "paginas": paginas,
+        # Solo en el laboratorio (local): lo que ha leído cada línea, para depurar extractores.
+        "lineas": [{"texto": ln.texto, "alternativa": ln.alternativa, "origen": ln.origen,
+                    "confianza": ln.confianza, "pagina": ln.pagina, "caja": [round(v, 4) for v in ln.caja]}
+                   for ln in doc.lineas],
+    }
+    return salida
+
+
 @app.get("/api/plantilla")
 def ver_plantilla():
     return {"campos": plantilla.cargar(), "ruta": str(plantilla.RUTA)}

@@ -1,13 +1,16 @@
 # OCR Doc Lab
 
 OCR **local, sin nube**, para documentos: un **laboratorio** para evaluar y calibrar, y un
-**servicio** HTTP de producción que usa el mismo código. Hoy cubre el DNI español; la idea es
-añadir más documentos (ver [OCR local multi-documento](docs/ocr-multidocumento.md)).
+**servicio** HTTP que usa el mismo código y solo escucha en localhost. Cubre el DNI español y
+16 tipos de documento: titulaciones de prevención, documentos de empresa (certificados de la
+TGSS y la AEAT, póliza de RC, registro de empresas, apertura de centro, planes y evaluaciones) y
+del trabajador (contrato, reconocimiento médico y fichas firmadas). Ver
+[OCR local multi-documento](docs/ocr-multidocumento.md) y el [Roadmap](docs/roadmap.md).
 
 | | Qué es | Arrancar |
 |---|---|---|
-| **Lab** (`mrzlab/`) | Página local para comparar motores, ver lo que lee el OCR, medir la calidad de la foto y calibrar | `docker compose up --build` → <http://localhost:8080> |
-| **Servicio** (`servicio/`) | API sin estado: `POST /v1/dni/verificar` (anverso + reverso + DNI declarado) | `docker compose --profile servicio up --build servicio` → <http://localhost:8001>. Ver [servicio/README.md](servicio/README.md) |
+| **Lab** (`mrzlab/`) | Página local para comparar motores, ver lo que lee el OCR, medir la calidad de la foto y calibrar. Documentos en `/documentos` | `docker compose up --build` → <http://localhost:8080> |
+| **Servicio** (`servicio/`) | API sin estado: `POST /v1/dni/verificar` y `POST /v1/documentos/{tipo}/extraer` | `docker compose --profile servicio up --build servicio` → <http://localhost:8001>. Ver [servicio/README.md](servicio/README.md) |
 
 Con el DNI, el lab compara motores leyendo la **MRZ** (las 3 líneas `IDESP…<<<` del reverso),
 valida los dígitos de control, lee los campos del anverso y evalúa la calidad de la foto
@@ -103,6 +106,36 @@ formato del soporte, nombre sin dígitos).
 > distingue letras cuyo valor difiere en 10 (M/W, F/P, G/Q, K/U…). En las pruebas apareció un
 > «MNU» leído por «WNU» con todos los controles correctos. El nº de DNI y las fechas sí están
 > protegidos del todo: cualquier cambio en un solo dígito se detecta.
+
+## Documentos
+
+En <http://localhost:8080/documentos>: eliges el tipo, arrastras un PDF o una foto (o pides una
+muestra sintética en PDF digital, escaneado o foto) y ves lo que lee el servicio: campos con su
+origen y confianza, validaciones, clasificación, firma/CSV/QR, calidad y, línea a línea, el texto
+leído por cada motor sobre la página (en verde, las líneas de donde sale un campo).
+
+Tres caminos según la entrada, decididos por página:
+
+- **PDF con capa de texto**: texto y campos de formulario sin OCR (≈0,1 s por documento).
+- **PDF escaneado**: render a 300 ppp, orientación e inclinación, Tesseract (≈3–4 s por página).
+- **Foto de móvil**: se busca la hoja y se endereza; RapidOCR encuentra las líneas y las
+  reconocen Tesseract y RapidOCR (≈5 s por foto con 2 CPU).
+
+### Medir con un lote
+
+```bash
+# Lote real (fuera del repositorio): documentos + verdad.csv (archivo,tipo,campo,valor)
+python -m herramientas.medir datos/reales
+# Lote sintético: N documentos por tipo y por origen
+python -m herramientas.medir --sintetico 2 --origenes digital,escaneado,foto
+```
+
+El informe da, por tipo y origen, cuántos documentos salen COMPLETA / INCOMPLETA / ILEGIBLE /
+OTRO_DOCUMENTO, el acierto por campo, los tiempos y, lo más importante, los **campos erróneos
+dados por buenos** (deben ser 0; el comando termina con error si hay alguno).
+
+La carpeta `datos/` está en `.gitignore` y `.dockerignore`: ahí van los documentos reales (con
+consentimiento) y los descargados. **Nunca** al repositorio.
 
 ## Modo por lotes (cientos o miles de fotos)
 
@@ -272,13 +305,25 @@ mrzlab/
   analisis.py    análisis de una foto (lo usan la página y el lote)
   lote.py        modo por lotes y comparación con verdad.csv
   sintetico.py   DNI ficticios, degradaciones "de móvil" y generador de lotes
-  static/index.html
+  documentos.py  leer un documento (PDF o imagen) y extraer los campos de un tipo
+  pdf.py         capa de texto, formularios y render de PDF (pdfplumber, pypdfium2)
+  pagina.py      hoja en la foto, orientación e inclinación
+  ocr_documento.py  OCR de páginas: Tesseract + detección y relectura con RapidOCR
+  lineas.py      formato común de lo leído (texto, caja, página, origen, confianza)
+  validadores.py NIF/NIE/CIF, fechas e importes
+  autenticidad.py firma PAdES, CSV/CEA, QR y metadatos
+  clasificador.py qué tipo de documento es
+  extractores/   un extractor por tipo (titulaciones, empresa, trabajador, firma)
+  sintetico_docs.py documentos sintéticos de cada tipo (PDF, escaneo, foto)
+  static/index.html, static/documentos.html
 servicio/        API de producción sobre mrzlab (ver servicio/README.md)
   app.py         app FastAPI: X-Api-Key, /health
   api.py         POST /v1/dni/verificar
+  documentos.py  /v1/documentos/tipos, /{tipo}/extraer, /clasificar
   lectura.py     lectura de cada cara del DNI
   verificacion.py  decisión: VERIFICADO / REPETIR / REVISION_ADMIN
-docs/            propuestas (OCR multi-documento)
+herramientas/    medir.py (lotes con verdad.csv), contrato.py (openapi.json y ejemplos)
+docs/            diseño, roadmap, openapi.json y ejemplos de respuesta
 umbrales.yaml    umbrales de calidad (editables)
 plantillas/      plantilla de posiciones del anverso (solo coordenadas)
 CONSENTIMIENTO.md  plantilla para voluntarios
@@ -289,16 +334,17 @@ tests/
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest
+python -m pytest                 # todo (los de OCR real tardan unos minutos)
+python -m pytest -m "not ocr"    # sin los escaneos y fotos con OCR real
 ```
 
-Los tests de extremo a extremo se saltan los motores que no estén instalados.
+Los tests de extremo a extremo se saltan los motores que no estén instalados. Los documentos de
+los tests son sintéticos (`mrzlab/sintetico_docs.py`), con datos inventados.
 
 ## Próximos pasos
 
-[Hacia un OCR local multi-documento](docs/ocr-multidocumento.md): llevar esto a otros documentos
-(titulaciones, certificados…) con un extractor por tipo y un servicio con un endpoint por
-documento, siempre en localhost. Plan de desarrollo con sus pruebas: [Roadmap](docs/roadmap.md).
+Ver el estado de cada hito en el [Roadmap](docs/roadmap.md): falta sobre todo medir con
+documentos reales de cada tipo (con consentimiento) y calibrar con ellos.
 
 ## Licencias
 

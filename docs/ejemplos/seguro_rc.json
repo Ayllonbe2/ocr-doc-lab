@@ -1,0 +1,82 @@
+{
+  "tipo": "seguro_rc",
+  "lectura": "COMPLETA",
+  "origen": "pdf_digital",
+  "paginas": 1,
+  "campos": {
+    "tomador": {
+      "valor": "CONSTRUCCIONES EJEMPLO SL",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "identificador": {
+      "valor": "B60233970",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "aseguradora": {
+      "valor": "DE SEGUROS Y REASEGUROS",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "poliza": {
+      "valor": "RC-2627414",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "vigencia_desde": {
+      "valor": "2026-03-29",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "vigencia_hasta": {
+      "valor": "2027-03-28",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "limite_siniestro": {
+      "valor": 600000.0,
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    }
+  },
+  "validaciones": {
+    "identificador_valido": true,
+    "vigente": true,
+    "fechas_coherentes": true
+  },
+  "clasificacion": {
+    "tipo_detectado": "seguro_rc",
+    "confianza": 0.88,
+    "candidatos": [
+      {
+        "tipo": "seguro_rc",
+        "puntos": 10.5
+      },
+      {
+        "tipo": "formacion_art19",
+        "puntos": 0.5
+      }
+    ],
+    "coincide": true
+  },
+  "autenticidad": {
+    "firmas": [],
+    "codigos_verificacion": [],
+    "qr": [],
+    "avisos": []
+  },
+  "calidad": {
+    "veredicto": "apta",
+    "avisos": []
+  },
+  "avisos": [],
+  "tiempo_ms": 0
+}

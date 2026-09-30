@@ -1,0 +1,301 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OCR Doc Lab · servicio",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/dni/verificar": {
+      "post": {
+        "summary": "Verificar Dni",
+        "description": "Verifica el DNI y devuelve VERIFICADO, REPETIR o REVISION_ADMIN.\n\nSin estado: el backend guarda el nº de intento y, en REVISION_ADMIN, avisa al admin con los\ndatos leídos y el motivo. Las imágenes se procesan en memoria y se descartan.",
+        "operationId": "verificar_dni_v1_dni_verificar_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_verificar_dni_v1_dni_verificar_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Verificar Dni V1 Dni Verificar Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/documentos/tipos": {
+      "get": {
+        "summary": "Tipos",
+        "description": "Tipos admitidos, con sus campos y cuáles son obligatorios.",
+        "operationId": "tipos_v1_documentos_tipos_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Tipos V1 Documentos Tipos Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/documentos/clasificar": {
+      "post": {
+        "summary": "Clasificar",
+        "description": "Qué tipo de documento parece (o `null` si ninguno), con los candidatos y su puntuación.",
+        "operationId": "clasificar_v1_documentos_clasificar_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_clasificar_v1_documentos_clasificar_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Clasificar V1 Documentos Clasificar Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/documentos/{tipo}/extraer": {
+      "post": {
+        "summary": "Extraer",
+        "description": "Lee el documento y devuelve sus campos, validaciones, autenticidad y calidad.\n\n`lectura`: COMPLETA · INCOMPLETA (revisión manual) · ILEGIBLE (pedir otra foto o escaneo) ·\nOTRO_DOCUMENTO (se ha subido otro tipo de documento). Quien llama compara los campos con sus\ndatos y decide.",
+        "operationId": "extraer_v1_documentos__tipo__extraer_post",
+        "parameters": [
+          {
+            "name": "tipo",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Tipo"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_extraer_v1_documentos__tipo__extraer_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Extraer V1 Documentos  Tipo  Extraer Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_clasificar_v1_documentos_clasificar_post": {
+        "properties": {
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "description": "PDF, JPG, PNG o WEBP"
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_clasificar_v1_documentos_clasificar_post"
+      },
+      "Body_extraer_v1_documentos__tipo__extraer_post": {
+        "properties": {
+          "archivo": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "description": "PDF, JPG, PNG o WEBP"
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_extraer_v1_documentos__tipo__extraer_post"
+      },
+      "Body_verificar_dni_v1_dni_verificar_post": {
+        "properties": {
+          "anverso": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Anverso",
+            "description": "Foto del anverso del DNI (JPG, PNG, WEBP)"
+          },
+          "reverso": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "Reverso",
+            "description": "Foto del reverso del DNI, con la MRZ"
+          },
+          "dni_declarado": {
+            "type": "string",
+            "title": "Dni Declarado",
+            "description": "Nº de DNI que ha indicado el usuario"
+          },
+          "intento": {
+            "type": "integer",
+            "title": "Intento",
+            "description": "1 o 2: lo lleva el backend",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "anverso",
+          "reverso",
+          "dni_declarado"
+        ],
+        "title": "Body_verificar_dni_v1_dni_verificar_post"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

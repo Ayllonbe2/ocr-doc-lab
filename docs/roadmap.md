@@ -4,24 +4,107 @@ Plan de desarrollo para llevar el OCR del DNI a **todos los tipos de documento**
 certificados, pólizas, contratos, fichas firmadas…), con sus pruebas, y sustituir por completo un
 OCR en la nube. Diseño general en [OCR local multi-documento](ocr-multidocumento.md).
 
-Estado: propuesta.
+**Estado (30/09/2026):** hitos H1–H5 implementados y probados (16 tipos de documento). Falta sobre
+todo medir y calibrar con **documentos reales** de cada tipo (§5) y lo que depende de quien llama
+(H6). Resultados de la medición en [§0](#0-estado-y-resultados).
 
 ## Reglas
 
 - **Todo en localhost.** El servicio escucha solo en `127.0.0.1` (o en la red interna de Docker
   del mismo servidor). No se publica como API en internet, no tiene subdominio y ningún documento
   sale de la máquina.
-- **Sin nube y sin telemetría.** Solo motores locales (Tesseract, RapidOCR, PaddleOCR); se
-  comprueba que el contenedor no hace conexiones salientes.
+- **Sin nube y sin telemetría.** Solo motores locales (Tesseract, RapidOCR); las pruebas de CI se
+  ejecutan con la red del contenedor cortada.
 - **Sin estado y sin guardar nada.** Los bytes llegan en la petición, se procesan en memoria (sin
-  ficheros temporales) y se descartan. Los logs solo llevan tipo, resultado y tiempo.
+  ficheros temporales) y se descartan. Los logs solo llevan tipo, resultado y tiempo (y las
+  librerías de PDF, que en DEBUG vuelcan el texto, nunca bajan de WARNING).
 - **El OCR lee; no decide.** Devuelve qué pone el documento y si es coherente consigo mismo
   (letra del NIF, fechas, horas, firma…). Comparar con los datos del usuario y aceptar o rechazar
   es cosa de quien llama.
 - **Métrica que manda: 0 datos erróneos dados por buenos.** Mejor pedir otra foto o pasar a
   revisión manual que inventar un dato.
 - **Licencias permisivas.** Nada AGPL/GPL en el servicio (por eso no PyMuPDF; el modelo `mrz` de
-  Tesseract sigue desactivado por defecto).
+  Tesseract sigue desactivado en la imagen de producción).
+
+---
+
+## 0. Estado y resultados
+
+| Hito | Estado |
+|---|---|
+| H1 Núcleo de documentos | ✔ Hecho |
+| H2 Titulaciones de prevención | ✔ Hecho · probado con 3 títulos reales |
+| H3 Clasificador y fotos de documentos A4 | ✔ Hecho · falta calibrar con fotos reales |
+| H4 Documentos de empresa | ✔ Hecho · sin muestras reales todavía |
+| H5 Documentos de prevención del trabajador | ✔ Hecho · probado con 2 modelos oficiales rellenados |
+| H6 Sustituir el OCR en la nube | Depende de quien llama (el servicio ya está listo) |
+
+### Medición (`python -m herramientas.medir`)
+
+Con 2 CPU (el límite del contenedor), 30/09/2026:
+
+| Lote | Docs | COMPLETA | Campos erróneos dados por buenos | Tiempo por documento (mediana / p95) |
+|---|---|---|---|---|
+| Sintéticos, PDF digital (16 tipos × 2) | 32 | 32 (100 %) | **0** | 0,07 s / 0,13 s |
+| Sintéticos, escaneados | 32 | 31 (97 %) | **0** | 4,1 s / 7,2 s |
+| Sintéticos, foto de móvil | 32 | 26 (81 %)¹ | **0** | 4,8 s / 7,0 s |
+| Títulos reales (diploma FLC digital, FP fotografiado, máster escaneado) | 3 | 3 · 18/18 campos | **0** | 0,7 s digital; 17–24 s escaneado² |
+| Modelos oficiales rellenados (contrato del SEPE, registro de EPI) en formulario, aplanado y escaneado | 12 | 5³ | **0** | 1,3 s digital; 17 s escaneado² |
+
+1. Las 2 fotos del contrato no pueden estar completas: la fecha de inicio está en la página 2.
+   Sin ellas, 26/30 (87 %). Los que no salen COMPLETA quedan INCOMPLETA o ILEGIBLE, nunca con un
+   dato erróneo.
+2. Varias páginas por OCR (el contrato del SEPE tiene 20; como mucho 5 pasan por OCR) o fotos de
+   títulos enmarcados con reflejos, que necesitan los dos motores.
+3. En los registros de EPI escaneados no se puede asegurar si están firmados (queda INCOMPLETA).
+
+Pruebas: 278 rápidas + 33 con OCR real, todas en verde; en CI se ejecutan sin red.
+
+### Cambios respecto al plan inicial (aprendido al construirlo)
+
+- **Cuarto estado de lectura: `OTRO_DOCUMENTO`.** Cuando el clasificador ve claramente otro tipo
+  (un diploma subido como máster), se dice así en vez de «incompleto».
+- **PDF con PDFium, no con pdfplumber.** Leer las 20 páginas del contrato oficial del SEPE tardaba
+  8,4 s con pdfplumber y 0,16 s con PDFium. pdfplumber queda solo para los valores de formularios
+  sin aplanar (que viven en anotaciones).
+- **Límite de páginas por tipo.** El modelo oficial de contrato tiene 20 páginas (instrucciones de
+  todas sus variantes): 5 por defecto, 25 en contratos, 60 en documentos libres. Como mucho 5
+  páginas pasan por OCR.
+- **Dos motores combinados en vez de elegir uno por tipo.** Tesseract respeta espacios, tildes y
+  Ñ, pero en fotos con reflejos se deja trozos de página; RapidOCR encuentra casi todas las líneas
+  pero pega palabras («conDNI1.234.567-L») y no conoce la Ñ. En fotos: RapidOCR detecta las líneas,
+  Tesseract las reconoce (todas en una sola llamada, con el contraste normalizado por línea) y
+  RapidOCR relee solo las dudosas. En escaneos limpios basta Tesseract.
+- **Confusiones típicas del OCR en identificadores** (B↔8, D↔0): se corrigen solo en la posición
+  de la letra y solo si el dígito o letra de control lo confirma, y solo junto a su etiqueta.
+- **Sin Augraphy.** Las degradaciones de escaneo y foto se hacen con las de `sintetico.py`
+  (perspectiva, luz, sombra, ruido, JPEG): una dependencia menos.
+- **FLC: el «número de curso» no identifica a la persona.** Lo comparten todos los alumnos del
+  curso; el identificador del alumno es el «nº de registro» (`NNNNNN/NNNNNN/NNNNNNN`). Para
+  detectar un diploma usado por dos personas hay que usar el nº de registro.
+- **El CSV no tiene dígito de control.** Si sale del OCR, solo se devuelve si los dos motores leen
+  el mismo código; si no, se omite con un aviso (en fotos, un «5» leído como «S» daba un código
+  erróneo).
+- **Fechas que no son del documento.** Se excluyen la de nacimiento y las del propio modelo de
+  formulario («Fecha aprobación», «Revisión», «Versión»). Si hay etiqueta de expedición pero su
+  fecha es ilegible, el campo queda vacío en vez de coger otra fecha.
+- **Fichas con dos personas.** En los modelos reales el primer «D./Dª.» suele ser quien entrega o
+  informa; el trabajador se busca por sus etiquetas («entrega a», «persona que se incorpora»…) y la
+  firma se mide junto a la etiqueta del trabajador, sin contar trazos que invaden desde la fila de
+  arriba.
+
+### Siguiente
+
+1. **Lote real por tipo** (§5): hoy hay 3 títulos reales y 2 modelos oficiales rellenados con
+   datos ficticios. Faltan certificados TGSS/AEAT reales (se descargan al momento), pólizas, REA,
+   aperturas, contratos, reconocimientos y fichas; y fotos de móvil de todos.
+2. **Calibrar** los umbrales de calidad de documentos (`umbrales.yaml → documento`) con esas fotos.
+3. **Tiempo en fotos** (mediana 4,8 s y p95 7 s con 2 CPU): bajar el p95 por debajo de 6 s.
+4. **Cadena de confianza de las firmas** sin conexión: incluir en la imagen las raíces de
+   confianza (FNMT, sedes de la Administración) para pasar de «íntegra» a «de confianza».
+5. **Plantillas de posiciones por emisor** (como la del anverso del DNI) para los formatos fijos
+   más frecuentes (diploma FLC), para leer por posición cuando el OCR no encuentra la etiqueta.
+6. Datasets públicos (MIDV-2020 para el DNI; XFUND español para formularios) aún sin usar.
 
 ---
 
@@ -31,50 +114,23 @@ Estado: propuesta.
 
 | Método | Ruta | Qué hace | Estado |
 |---|---|---|---|
-| `GET` | `/health` | Estado del servicio; añadir motores disponibles y versión de extractores | Existe |
-| `POST` | `/v1/dni/verificar` | Flujo completo del DNI | Existe |
-| `GET` | `/v1/documentos/tipos` | Tipos admitidos, sus campos y validaciones | Nuevo |
-| `POST` | `/v1/documentos/{tipo}/extraer` | Lee un documento del tipo indicado | Nuevo |
-| `POST` | `/v1/documentos/clasificar` | Dice qué tipo de documento es | Nuevo |
+| `GET` | `/health` | Estado del servicio, motores y nº de tipos | ✔ |
+| `POST` | `/v1/dni/verificar` | Flujo completo del DNI | ✔ |
+| `GET` | `/v1/documentos/tipos` | Tipos admitidos, sus campos y obligatorios | ✔ |
+| `POST` | `/v1/documentos/{tipo}/extraer` | Lee un documento del tipo indicado | ✔ |
+| `POST` | `/v1/documentos/clasificar` | Dice qué tipo de documento es | ✔ |
 
-### Petición (`multipart/form-data`)
-
-| Campo | Tipo | |
-|---|---|---|
-| `archivo` | fichero | PDF, JPG, PNG, WEBP · máx. 15 MB · PDF máx. 5 páginas (configurable) |
-
-La clave `X-Api-Key` se mantiene como segunda barrera por si otro proceso de la máquina llama al
-puerto; no sustituye a que el puerto no esté expuesto.
-
-### Respuesta (200)
-
-```json
-{
-  "tipo": "flc_60h",
-  "lectura": "COMPLETA",
-  "origen": "pdf_digital",
-  "paginas": 2,
-  "campos": {
-    "titular": {"valor": "GOMEZ RUIZ, LUIS", "origen": "capa_texto", "confianza": 1.0, "pagina": 1},
-    "nif":     {"valor": "12345678Z", "origen": "capa_texto", "confianza": 1.0, "pagina": 1},
-    "horas":   {"valor": 60, "origen": "capa_texto", "confianza": 1.0, "pagina": 1},
-    "fecha":   {"valor": "2025-03-14", "origen": "capa_texto", "confianza": 1.0, "pagina": 1}
-  },
-  "validaciones": {"nif_letra_valida": true, "horas_60": true, "menciona_flc": true, "fecha_no_futura": true},
-  "clasificacion": {"tipo_detectado": "flc_60h", "coincide": true, "confianza": 0.92},
-  "autenticidad": {"firma": null, "csv": null, "qr": null, "avisos": []},
-  "calidad": {"veredicto": "apta", "avisos": []},
-  "avisos": [],
-  "tiempo_ms": 180
-}
-```
+Contrato completo en [openapi.json](openapi.json) y un ejemplo de respuesta por tipo en
+[ejemplos/](ejemplos/) (se regeneran con `python -m herramientas.contrato`; un test falla si no
+coinciden con el servicio). Detalle de la respuesta en [servicio/README.md](../servicio/README.md).
 
 - `lectura`: `COMPLETA` (todos los campos obligatorios) · `INCOMPLETA` (faltan campos con buena
-  calidad → revisión manual) · `ILEGIBLE` (mala calidad → pedir otra foto o escaneo).
+  calidad → revisión manual) · `ILEGIBLE` (mala calidad → pedir otra foto o escaneo) ·
+  `OTRO_DOCUMENTO` (se ha subido otro tipo de documento).
 - `origen`: `pdf_digital` · `pdf_escaneado` · `pdf_mixto` · `imagen`. Cada campo lleva el suyo
-  (`capa_texto` u `ocr:<motor>`).
-- `autenticidad.firma`: `{valida, firmante, integra}` si el PDF tiene firma PAdES.
-  `csv` / `qr`: el código leído, para comprobarlo en la sede del organismo emisor.
+  (`capa_texto`, `formulario`, `ocr:tesseract`, `ocr:rapidocr`, `calculado`…).
+- `autenticidad`: `firmas` (PAdES: `integra`, `cubre_todo`, `modificado_tras_firmar`, `firmante`),
+  `codigos_verificacion` (CSV/CEA), `qr` y `avisos` (editores, guardados posteriores).
 
 ### Errores
 
@@ -85,21 +141,21 @@ puerto; no sustituye a que el puerto no esté expuesto.
 | 404 | `{tipo}` no existe |
 | 413 | Más de 15 MB |
 | 415 | Formato no admitido |
-| 422 | PDF con más páginas del límite |
-| 503 | Ningún motor OCR disponible (un PDF digital sigue funcionando sin OCR) |
+| 422 | PDF con más páginas del límite del tipo |
+| 503 | Hace falta OCR y no hay motores (un PDF digital sigue funcionando sin ellos) |
 
 ### Tres caminos según la entrada
 
 ```
-                  ┌─ PDF con capa de texto ──► texto + posiciones, sin OCR          ◄ exacto
-archivo ─► entrada ┼─ PDF escaneado ─────────► render 300 ppp ─► OCR                ◄ medio
-                  └─ foto de móvil ─────────► calidad ─► enderezar hoja ─► OCR      ◄ difícil
-                                                          │
-                     mismo extractor por tipo ◄───────────┘  (recibe líneas: texto + caja + origen)
+                  ┌─ PDF con capa de texto ──► texto + posiciones (PDFium) + formularios ◄ exacto, ≈0,1 s
+archivo ─► entrada ┼─ PDF escaneado ─────────► render 300 ppp ─► orientar ─► Tesseract     ◄ ≈3–4 s/página
+                  └─ foto de móvil ─────────► hoja ─► enderezar ─► detección RapidOCR
+                                                 ─► Tesseract por línea (+ RapidOCR si duda) ◄ ≈5 s
+                     mismo extractor por tipo  (recibe líneas: texto + caja + origen + lectura alternativa)
 ```
 
-Se decide **por página** (hay PDFs mixtos). Antes del OCR se buscan pruebas de autenticidad
-(firma, CSV, QR, metadatos de edición), que valen más que cualquier lectura.
+Se decide **por página** (hay PDFs mixtos). Además de leer, se buscan pruebas de autenticidad
+(firma, CSV, QR, metadatos de edición).
 
 ---
 
@@ -107,178 +163,136 @@ Se decide **por página** (hay PDFs mixtos). Antes del OCR se buscan pruebas de 
 
 ```
 mrzlab/
-  entrada.py          # imagen / PDF digital / escaneado / mixto, por página
-  pdf.py              # texto con posiciones (pdfplumber) y render (pypdfium2)
-  autenticidad.py     # firma PAdES (pyHanko), CSV por regex, QR (cv2.QRCodeDetector), metadatos
-  pagina.py           # hoja A4 en foto: detectar, perspectiva, orientación (Tesseract OSD), deskew
-  lineas.py           # Linea(texto, caja, pagina, origen, confianza): lo que reciben los extractores
-  validadores.py      # NIF / NIE / CIF, fechas españolas, importes
+  documentos.py       # leer (PDF o imagen, por página) y procesar un tipo; estados de lectura
+  pdf.py              # PDFium: capa de texto, imágenes, render, metadatos; pdfplumber: formularios
+  pagina.py           # hoja en la foto, orientación (Tesseract OSD), inclinación
+  ocr_documento.py    # Tesseract de página; híbrido detección RapidOCR + relectura; combinar
+  lineas.py           # Linea(texto, caja, pagina, origen, confianza, alternativa)
+  validadores.py      # NIF / NIE / CIF (y corrección con control), fechas, importes
+  autenticidad.py     # firma PAdES (pyHanko), CSV/CEA confirmados, QR, metadatos
   clasificador.py     # tipo de documento por palabras clave con peso
+  calidad.py          # + evaluar_documento (alto de letra, reflejo sobre papel)
   extractores/
-    base.py           # Extractor: tipo, campos, obligatorios, extraer(lineas), validar(campos)
-    flc_60h.py  ts_riesgos.py  ts_prl.py
-    certificado_tgss.py  certificado_aeat.py  seguro_rc.py  registro_empresa.py
-    apertura_centro.py  documento_libre.py
-    contrato_laboral.py  reconocimiento_medico.py  ficha_firmada.py
-  sintetico_docs.py   # plantillas con datos ficticios → PDF digital, escaneado y foto degradada
+    base.py           # Extractor, Campo, buscar, tras_etiqueta, valor_tras, nombres
+    comunes.py        # titular, NIF del titular, empresa, razón social, fechas, validez
+    firma.py          # ¿firmada? tinta en la zona de firma del trabajador
+    titulaciones.py   # flc_60h, ts_riesgos, ts_prl
+    empresa.py        # certificados TGSS/AEAT, seguro_rc, registro_empresa, apertura, libres
+    trabajador.py     # contrato_laboral, reconocimiento_medico, fichas art. 18/19 y EPI
+  sintetico_docs.py   # plantillas con datos ficticios → PDF digital, escaneado y foto
+  static/documentos.html   # página del lab
 servicio/
   documentos.py       # router /v1/documentos/*
 herramientas/
-  medir.py            # lote real (fuera del repo) + verdad.csv → informe por campo y por origen
+  medir.py            # lote real o sintético + verdad.csv → informe por campo y por origen
+  contrato.py         # regenera docs/openapi.json y docs/ejemplos/
+  rellenar_formularios.py  # rellena modelos oficiales en blanco con datos ficticios
 tests/
-  extractores/test_<tipo>.py  test_entrada.py  test_pdf.py  test_autenticidad.py
-  test_validadores.py  test_clasificador.py  test_pagina.py  test_documentos_api.py
+  test_validadores.py  test_pdf.py  test_autenticidad.py  test_extractores.py  test_clasificador.py
+  test_pagina.py  test_documentos_api.py  test_sintetico_docs.py  test_lab_documentos.py
+  test_licencias.py
+.github/workflows/tests.yml   # CI: imagen, pruebas sin red, licencias
 ```
 
-Dependencias nuevas: `pypdfium2`, `pdfplumber`, `pyHanko`. Solo en desarrollo: `reportlab` (PDF
-con capa de texto en los tests), `augraphy` (degradar a escaneo/foto), `pip-licenses`.
+Dependencias nuevas (todas MIT/BSD/Apache): `pypdfium2`, `pdfplumber`, `pyHanko`, `reportlab`
+(documentos sintéticos del lab y de los tests). Solo en desarrollo: `pypdf`, `pip-licenses`.
 
 ---
 
 ## 3. Pruebas
 
-Cada extractor pasa por los mismos niveles:
-
 | Nivel | Qué prueba | Datos | ¿En CI? |
 |---|---|---|---|
-| **U** unitario | `extraer(lineas)` y `validar(campos)` con líneas escritas a mano, sin OCR | En el test | Sí |
-| **D** PDF digital | Plantilla → PDF con `reportlab` → endpoint → campos exactos | `sintetico_docs.py` | Sí |
-| **E** escaneado / foto | Plantilla → imagen → degradación → OCR real | `sintetico_docs.py` + Augraphy | Sí, `@pytest.mark.ocr` (lento) |
-| **N** negativos | Otro tipo, página en blanco, corrupto, cifrado, foto ilegible | Sintéticos | Sí |
-| **A** API | Contrato, errores, límites, no escribe en disco, logs sin datos | Sintéticos | Sí |
-| **R** regresión real | `herramientas/medir.py` con `verdad.csv` | Reales con consentimiento, **fuera del repo** | No: a mano antes de dar un tipo por bueno |
+| **U** unitario | `extraer` y `validar` con líneas escritas a mano, sin OCR (cada caso raro visto con documentos reales tiene la suya) | En el test | Sí |
+| **D** PDF digital | Los 16 tipos: PDF sintético → campos exactos y COMPLETA | `sintetico_docs.py` | Sí |
+| **E** escaneado / foto | Los 16 tipos escaneados y fotografiados con OCR real: nunca un dato erróneo en COMPLETA; ≥ 80 % de escaneados COMPLETA | `sintetico_docs.py` | Sí, `-m ocr` (lento) |
+| **N** negativos | Cada tipo procesado como otro, página en blanco, corrupto, cifrado, formato | Sintéticos | Sí |
+| **A** API | Contrato, errores, límites, clave, no escribe en disco, logs sin datos, datos de salud | Sintéticos | Sí |
+| **R** regresión real | `herramientas/medir.py` con `verdad.csv` | Reales y modelos oficiales, **fuera del repo** | No: a mano |
 
-- **Contrato versionado:** se exporta `docs/openapi.json` y un ejemplo de respuesta por tipo en
-  `docs/ejemplos/`; un test falla si el contrato cambia sin actualizarlos.
-- **Red:** un test de extremo a extremo con la red del contenedor cortada (`network_mode: none`)
-  procesa un documento de cada tipo.
+Además: firma PAdES íntegra / modificada / alterada (certificado generado en el test), CSV, QR,
+licencias (nada GPL/AGPL), contrato publicado al día, página del lab.
 
-**Criterio para dar un tipo por bueno (nivel R):**
-- 0 campos erróneos con `lectura = COMPLETA`.
-- `COMPLETA` en ≥ 95 % de PDF digitales, ≥ 80 % de escaneados, ≥ 60 % de fotos (el resto,
-  `ILEGIBLE` o `INCOMPLETA`, nunca un dato inventado).
-- p95 por página: < 1 s en PDF digital, < 6 s con OCR, con 2 CPU.
+```bash
+python -m pytest -m "not ocr"     # ≈280 pruebas, ≈2 min
+python -m pytest -m ocr           # escaneos y fotos con OCR real, varios minutos
+```
 
-### Errores típicos que las pruebas deben impedir
-
-| Error | Test |
-|---|---|
-| Convertir en imagen un PDF que ya tiene texto (más lento y con errores de lectura) | `test_pdf_digital_no_pasa_por_ocr` (el motor OCR falla si se le llama) |
-| Leer solo la primera página | `test_campo_en_pagina_2_se_encuentra` |
-| Rellenar un campo con un valor fijo en vez de leerlo, de modo que la validación nunca falla | `test_ts_riesgos_documento_cualquiera_no_da_titulo` |
-| Aceptar un solo formato de nº de registro FLC cuando hay varios | `test_flc_numero_registro_formatos` (incluido `NNNNNN/NNNNNN/NNNNNNN`) |
-| Tomar el primer "NN horas" del texto sin contexto | `test_flc_horas_solo_del_titulo_del_curso` |
-| Coger el NIF del centro o de la aseguradora en vez del del titular | `test_<tipo>_varios_nif_elige_titular` |
-| Dependencias AGPL/GPL | `pip-licenses` en CI |
+**Criterio para dar un tipo por bueno (nivel R):** 0 campos erróneos con `lectura = COMPLETA`;
+`COMPLETA` en ≥ 95 % de PDF digitales, ≥ 80 % de escaneados, ≥ 60 % de fotos; p95 por página
+< 1 s digital y < 6 s con OCR (2 CPU).
 
 ---
 
 ## 4. Hitos
 
-Tamaños: S ≈ días · M ≈ 1–2 semanas · L ≈ 3+ semanas (una persona).
+### H1 — Núcleo de documentos ✔
 
-### H1 — Núcleo de documentos (M)
+- [x] Lectura por página: PDF digital (PDFium), formularios sin aplanar, escaneado, mixto, imagen.
+- [x] Router `/v1/documentos/*` con límites, errores y la misma privacidad que el DNI.
+- [x] `sintetico_docs.py`: plantillas de los 16 tipos → PDF digital, escaneado y foto.
+- [x] `herramientas/medir.py` (lote real o sintético) y `herramientas/contrato.py`.
+- [x] CI en GitHub Actions: pruebas sin red y licencias.
+- [x] Pruebas: entrada (digital sin OCR, escaneado, mixto, formulario, cifrado, corrupto, páginas),
+      autenticidad (firma íntegra / modificada / alterada, CSV, QR), validadores, API.
 
-- [ ] `entrada.py`, `pdf.py`, `lineas.py`, `validadores.py`, `autenticidad.py`, `extractores/base.py`.
-- [ ] Router `servicio/documentos.py` con un tipo de prueba (`demo`), límites, errores y
-      privacidad como en el DNI.
-- [ ] `sintetico_docs.py` reutilizando las degradaciones de `sintetico.py`.
-- [ ] `herramientas/medir.py`.
-- [ ] CI: `pip-licenses` y test sin red.
-
-Pruebas:
-- [ ] `test_entrada.py`: PDF digital, "Imprimir a PDF" de una imagen (escaneado), mixto por
-      página, imagen con EXIF girado, cifrado → 400, corrupto → 400, 6 páginas → 422.
-- [ ] `test_pdf.py`: cajas en coordenadas de página; PDF digital sin OCR; campo en página 2.
-- [ ] `test_autenticidad.py`: PDF firmado con un certificado de prueba → válido; modificado tras
-      firmar → `integra: false`; CSV por regex; QR generado en la prueba.
-- [ ] `test_validadores.py`: letra de NIF/NIE, dígito de control del CIF, fechas ("14 de marzo de
-      2025", "14/03/2025", "14-03-25").
-- [ ] `test_documentos_api.py`: 401, 404, 413, 415, 422; no escribe en disco; logs sin datos.
-
-Hecho cuando: el tipo `demo` pasa D, E, N y A en CI.
-
-### H2 — Titulaciones de prevención (M)
+### H2 — Titulaciones de prevención ✔
 
 | Tipo | Campos obligatorios | Validaciones |
 |---|---|---|
-| `flc_60h` | titular, nif, horas, numero_registro, fecha | NIF válido; 60 h **en la frase del curso**; menciona FLC / Convenio de la Construcción; fecha ≤ hoy |
-| `ts_riesgos` | titular, nif, titulo, fecha | título **leído** con TÉCNICO SUPERIOR + PREVENCIÓN + RIESGOS; NIF válido; CCAA y nº de registro si aparecen |
-| `ts_prl` | titular, titulo, universidad, fecha | "Máster Universitario" + PRL en el título; `titulo_oficial` leído del texto; nº del Registro Nacional de Títulos si aparece |
+| `flc_60h` | titular, nif, horas, fecha | NIF válido; horas ≥ 60 **en la frase del curso**; menciona FLC / Convenio; fecha ≤ hoy |
+| `ts_riesgos` | titular, nif, titulo, fecha | título **leído** con TÉCNICO SUPERIOR + PREVENCIÓN + RIESGOS |
+| `ts_prl` | titular, titulo, universidad, fecha | título con PREVENCIÓN + RIESGOS + LABORALES; `titulo_oficial` leído del texto |
 
-- [ ] Extractores por etiqueta + posición; plantilla de posiciones para el diploma FLC.
-- [ ] Plantillas sintéticas de los tres tipos.
+- [x] Extractores por etiqueta, frase y posición; nº de registro del alumno y nº de curso separados.
+- [x] Probado con los 3 títulos reales disponibles (diploma FLC digital, FP fotografiado en PDF,
+      máster escaneado): todos los campos correctos.
+- [ ] Plantilla de posiciones del diploma FLC (formato fijo), para cuando el OCR no lee la etiqueta.
 
-Pruebas (U·D·E·N·A por tipo):
-- [ ] Casos buenos; NIF con letra mala; varios NIF; fechas en letra.
-- [ ] Máster **propio** → `titulo_oficial: false`; curso de 20 h como `flc_60h` → `horas_60: false`;
-      diploma FLC enviado como `ts_prl` → `clasificacion.coincide: false`.
-- [ ] Escaneado a 150 y 300 ppp; foto con sombra, perspectiva y desenfoque ligero.
-- [ ] R: lote real (§5).
+### H3 — Clasificador y fotos de documentos A4 ✔
 
-Hecho cuando: los tres tipos cumplen el criterio de §3 en PDF digital y escaneado.
+- [x] `clasificador.py` + `POST /v1/documentos/clasificar`; `OTRO_DOCUMENTO` en `/extraer`.
+- [x] `pagina.py`: hoja en la foto, perspectiva, orientación 0/90/180/270, inclinación.
+- [x] Calidad para A4 (`umbrales.yaml → documento`): alto de la letra, reflejo sobre el papel (el
+      papel blanco no es reflejo), sombras, nitidez.
+- [x] Motores combinados (ver «Cambios» en §0) y medición de tamaño de detección y umbral.
+- [x] Lab: página `/documentos` con muestras sintéticas, campos, texto por línea y página anotada.
+- [ ] Calibrar umbrales con fotos reales; XFUND (formularios escaneados en español).
 
-### H3 — Clasificador y fotos de documentos A4 (L) · la parte difícil
-
-- [ ] `clasificador.py` + `POST /v1/documentos/clasificar` (`{tipo_detectado, confianza, candidatos}`).
-- [ ] `pagina.py`: detectar la hoja, perspectiva, orientación 0/90/180/270, deskew.
-- [ ] Calidad para A4 con umbrales propios en `umbrales.yaml` (altura de letra en px, sombras,
-      reflejos) → `ILEGIBLE` con instrucciones, como en el DNI.
-- [ ] Fondos decorativos (orlas, sellos, marcas de agua): binarización adaptativa y quitar color.
-- [ ] Comparar motores por tipo (Tesseract `spa`, RapidOCR, PaddleOCR latino) con `medir.py`.
-- [ ] Lab: selector de tipo de documento y lote por tipo.
-
-Pruebas:
-- [ ] Matriz de confusión del clasificador con sintéticos de todos los tipos + negativos: ningún
-      tipo confundido con otro con confianza alta.
-- [ ] Foto sintética girada 90/180/270 y con perspectiva → texto recuperado.
-- [ ] Foto oscura o borrosa → `ILEGIBLE` con aviso concreto.
-- [ ] R: fotos de móvil de los documentos del lote; XFUND (español) para "etiqueta → valor".
-
-Hecho cuando: las titulaciones cumplen el criterio de §3 también en foto.
-
-### H4 — Documentos de empresa (M–L)
+### H4 — Documentos de empresa ✔
 
 | Tipo | Campos | Validaciones |
 |---|---|---|
-| `certificado_tgss` | razon_social, cif, fecha_emision, al_corriente, csv | CIF válido; caduca a los 6 meses de la emisión; firma PAdES si la hay |
-| `certificado_aeat` | ídem | ídem |
-| `seguro_rc` | tomador, cif, aseguradora, poliza, vigencia_desde, vigencia_hasta, limite_siniestro | vigencia en curso; importe leído |
-| `registro_empresa` | cif, numero_inscripcion, fecha | CIF válido |
-| `apertura_centro_trabajo` | cif, direccion_obra, fecha | CIF válido |
-| `plan_seguridad_salud`, `evaluacion_riesgos`, `cae_documentacion` | cif o razón social, fecha | solo clasificación y fecha: texto libre y largo, sin extracción de campos |
+| `certificado_tgss`, `certificado_aeat` | razón social, identificador, fecha de emisión, al corriente, CSV, caducidad | CIF/NIF válido; vigente (validez del propio documento o 6 meses) |
+| `seguro_rc` | tomador, identificador del **tomador**, aseguradora, póliza, vigencia, límite | vigente; fechas coherentes |
+| `registro_empresa` | razón social, identificador, nº de inscripción, fecha | identificador válido |
+| `apertura_centro_trabajo` | razón social, identificador, dirección de la obra, fecha | identificador válido |
+| `plan_seguridad_salud`, `evaluacion_riesgos`, `cae_documentacion` | razón social, identificador, fecha | solo clasificación (texto libre) |
 
-Orden: TGSS → AEAT → RC → registro y apertura → documentos libres.
+- [ ] Medir con certificados, pólizas, REA y aperturas reales.
 
-Pruebas (U·D·E·N·A por tipo), además:
-- [ ] Certificado firmado de prueba → `firma.valida`; alterado → `integra: false`.
-- [ ] Emitido hace 7 meses → aviso de caducado.
-- [ ] Póliza con el CIF de la aseguradora y el del tomador → se elige el del tomador.
-
-### H5 — Documentos de prevención del trabajador (M)
+### H5 — Documentos de prevención del trabajador ✔
 
 | Tipo | Campos | Nota |
 |---|---|---|
-| `contrato_laboral` | nif_trabajador, cif_empresa, fecha_inicio, tipo_contrato | |
-| `reconocimiento_medico` | nif, fecha, apto (sí / no / con restricciones) | **Datos de salud (art. 9 RGPD): solo estos campos**, nunca diagnóstico ni texto |
-| `informacion_art18`, `formacion_art19`, `entrega_epis` | nif_trabajador, fecha, firmado | detector de firma manuscrita en la zona de firma |
+| `contrato_laboral` | identificador de la empresa, razón social, NIF y nombre del trabajador, fecha de inicio, tipo | nunca el NIF del representante de la empresa |
+| `reconocimiento_medico` | NIF, fecha, apto | **solo** esos campos (datos de salud) |
+| `informacion_art18`, `formacion_art19`, `entrega_epis` | NIF y nombre del trabajador, fecha, firmado | firma manuscrita o electrónica |
 
-Pruebas (U·D·E·N·A por tipo), además:
-- [ ] `reconocimiento_medico`: el JSON **no contiene** ningún texto del documento fuera de los
-      campos permitidos (se buscan frases del sintético en la respuesta).
-- [ ] Ficha sin firmar → `firmado: false`; con firma sintética → `true`.
+- [x] Probado con el contrato indefinido oficial del SEPE y un registro de entrega de EPI real,
+      rellenados con datos ficticios (`herramientas/rellenar_formularios.py`), en formulario,
+      aplanado y escaneado.
+- [ ] Medir con reconocimientos y fichas reales.
 
-### H6 — Sustituir el OCR en la nube (M)
+### H6 — Sustituir el OCR en la nube
 
-1. [ ] **En paralelo:** quien llama usa los dos OCR durante 2–4 semanas y compara solo campos y
-       resultado (nunca imagen ni texto).
-2. [ ] **Cambio por tipo** cuando el local cumple §3 y no es peor que la nube en datos erróneos
-       dados por buenos.
-3. [ ] **Retirar** el cliente de la nube, sus credenciales y variables, y su mención en la
-       política de privacidad.
+Lo hace quien llama al servicio:
 
-Pruebas:
-- [ ] Un documento de cada tipo de extremo a extremo con el contenedor sin red.
+1. [ ] **En paralelo:** usar los dos OCR durante 2–4 semanas y comparar solo campos y resultado.
+2. [ ] **Cambio por tipo** cuando el local cumple §3 y no es peor en datos erróneos dados por buenos.
+3. [ ] **Retirar** el cliente de la nube, sus credenciales y su mención en la política de privacidad.
+
+El servicio ya está preparado: [x] funciona con el contenedor sin red (CI).
 
 ---
 
@@ -286,44 +300,33 @@ Pruebas:
 
 ### Lo que hay
 
-| Fuente | Útil para |
-|---|---|
-| `mrzlab/sintetico.py` — degradaciones (desenfoque, luz, reflejo, perspectiva, sombra, ruido, movimiento) | Base de `sintetico_docs.py` |
-| `tests/` — 84 tests del DNI | Patrón de los tests nuevos |
-| Muestras reales fuera del repo: un diploma FLC de 60 h con capa de texto y dos títulos escaneados sin capa de texto (FP superior y máster) | Primeros casos de R en H2 (digital y escaneado) |
-| Varios PDF genéricos de prevención (guías, formularios, un documento de otro país) | Solo negativos del clasificador |
+| Fuente | Dónde | Para qué |
+|---|---|---|
+| Documentos sintéticos de los 16 tipos (digital, escaneado, foto) | `mrzlab/sintetico_docs.py` | Tests (D, E, N) y medición |
+| 3 títulos reales (diploma FLC con capa de texto, FP y máster escaneados) | `datos/reales/` (fuera del repo) | Nivel R de H2 |
+| Contrato indefinido del **SEPE** y registro de entrega de **EPI** (formularios oficiales en blanco) | `datos/publicos/` → `datos/formularios/` rellenados con datos ficticios | Nivel R de H5 con maquetas reales |
+| Guías y documentos públicos de prevención (INSST, CARM, SS, BOE) | `datos/publicos/` | Negativos del clasificador; formato de títulos (RD 1002/2010, RD 22/2015) |
 
-No hay ninguna muestra real de documentos de empresa ni de prevención del trabajador.
+Documentos públicos usados: [modelos de contrato del SEPE](https://www.sepe.es/HomeSepe/es/empresas/Contratos-de-trabajo/modelos-contrato.html),
+[registro de entrega de EPI (IRNAS-CSIC)](https://www.irnas.csic.es/wp-content/uploads/2024/06/PRL_ENTREGA-INF_-02-entrega-EPI-01-06-2024.pdf),
+[RD 1002/2010 (títulos universitarios)](https://www.boe.es/buscar/pdf/2010/BOE-A-2010-12621-consolidado.pdf).
+No se han encontrado muestras públicas de certificados TGSS/AEAT, diplomas FLC ni pólizas: son
+documentos personales. Se generan desde sus sedes (TGSS y AEAT en el momento) o se piden con
+consentimiento.
 
 ### Lo que hay que conseguir
 
 - **30–50 documentos reales por tipo**, con consentimiento ([CONSENTIMIENTO.md](../CONSENTIMIENTO.md)),
   mezclando PDF digital, escaneado y foto. De cada documento, el PDF original **y** una foto de
-  móvil: dos casos con una sola fila de `verdad.csv`.
-- Fuera del repo: `datos/<tipo>/{digital,escaneado,foto}/` + `datos/<tipo>/verdad.csv`.
+  móvil: dos casos con la misma verdad.
+- Fuera del repo: `datos/<lote>/` con los documentos y `verdad.csv` (`archivo,tipo,campo,valor`).
 - **Nunca** subir documentos reales, CSV con datos reales ni plantillas aprendidas de ellos.
 
-### Datasets públicos (revisar la licencia de cada uno antes de usarlo)
+### Datasets públicos (revisar la licencia antes de usarlos)
 
-| Dataset | Aporta | Hito |
+| Dataset | Aporta | Uso previsto |
 |---|---|---|
-| [MIDV-2020](https://l3i-share.univ-lr.fr/MIDV2020/midv2020.html) | DNI español ficticio (entre 10 países) en escaneo, foto y vídeo, con campos anotados | DNI |
-| [SIDTD](https://arxiv.org/pdf/2401.01858) | Falsificaciones de esos documentos (recorte y sustitución, inpainting) | DNI (anti-fraude) |
-| [XFUND](https://www.microsoft.com/en-us/research/?p=844183) | Formularios escaneados **en español** con pares clave-valor anotados | H3 |
-| RVL-CDIP | Documentos escaneados en 16 clases | H3 (negativos del clasificador) |
-
-Ninguno contiene diplomas FLC, títulos de PRL ni certificados de la TGSS o la AEAT: para esos,
-plantillas sintéticas (CI) + lote real (medición).
-
----
-
-## 6. Orden
-
-```
-H1 Núcleo ──► H2 Titulaciones (digital, escaneado) ──► H6 cambio de titulaciones
-         ├──► H3 Clasificador + fotos A4 ──► H2 en foto
-         ├──► H4 Empresa (TGSS y AEAT primero)
-         └──► H5 Prevención del trabajador
-```
-
-H2 en PDF digital es lo primero que da valor; H3 es lo más costoso.
+| [MIDV-2020](https://l3i-share.univ-lr.fr/MIDV2020/midv2020.html) | DNI español ficticio en escaneo, foto y vídeo | DNI |
+| [SIDTD](https://arxiv.org/pdf/2401.01858) | Falsificaciones de esos documentos | DNI (anti-fraude) |
+| [XFUND](https://www.microsoft.com/en-us/research/?p=844183) | Formularios escaneados en español con pares clave-valor | Formularios (H3) |
+| RVL-CDIP | Documentos escaneados en 16 clases | Negativos del clasificador |

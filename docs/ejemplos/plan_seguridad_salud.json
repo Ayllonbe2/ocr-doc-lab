@@ -1,0 +1,54 @@
+{
+  "tipo": "plan_seguridad_salud",
+  "lectura": "COMPLETA",
+  "origen": "pdf_digital",
+  "paginas": 2,
+  "campos": {
+    "razon_social": {
+      "valor": "CONSTRUCCIONES EJEMPLO SL",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "identificador": {
+      "valor": "B60233970",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "fecha": {
+      "valor": "2025-12-29",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    }
+  },
+  "validaciones": {},
+  "clasificacion": {
+    "tipo_detectado": "plan_seguridad_salud",
+    "confianza": 0.83,
+    "candidatos": [
+      {
+        "tipo": "plan_seguridad_salud",
+        "puntos": 7.5
+      },
+      {
+        "tipo": "apertura_centro_trabajo",
+        "puntos": 0.5
+      }
+    ],
+    "coincide": true
+  },
+  "autenticidad": {
+    "firmas": [],
+    "codigos_verificacion": [],
+    "qr": [],
+    "avisos": []
+  },
+  "calidad": {
+    "veredicto": "apta",
+    "avisos": []
+  },
+  "avisos": [],
+  "tiempo_ms": 0
+}

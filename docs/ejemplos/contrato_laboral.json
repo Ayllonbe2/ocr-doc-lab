@@ -1,0 +1,75 @@
+{
+  "tipo": "contrato_laboral",
+  "lectura": "COMPLETA",
+  "origen": "pdf_digital",
+  "paginas": 2,
+  "campos": {
+    "identificador_empresa": {
+      "valor": "B60233970",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "razon_social": {
+      "valor": "CONSTRUCCIONES EJEMPLO SL",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "nif_trabajador": {
+      "valor": "26274143R",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "nombre_trabajador": {
+      "valor": "SERGIO GOMEZ RUIZ",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "fecha_inicio": {
+      "valor": "2025-09-30",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 2
+    },
+    "tipo_contrato": {
+      "valor": "INDEFINIDO",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    }
+  },
+  "validaciones": {
+    "identificador_empresa_valido": true,
+    "nif_trabajador_valido": true
+  },
+  "clasificacion": {
+    "tipo_detectado": "contrato_laboral",
+    "confianza": 0.83,
+    "candidatos": [
+      {
+        "tipo": "contrato_laboral",
+        "puntos": 7.5
+      },
+      {
+        "tipo": "formacion_art19",
+        "puntos": 0.5
+      }
+    ],
+    "coincide": true
+  },
+  "autenticidad": {
+    "firmas": [],
+    "codigos_verificacion": [],
+    "qr": [],
+    "avisos": []
+  },
+  "calidad": {
+    "veredicto": "apta",
+    "avisos": []
+  },
+  "avisos": [],
+  "tiempo_ms": 0
+}

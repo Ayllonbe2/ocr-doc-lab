@@ -1,0 +1,87 @@
+{
+  "tipo": "flc_60h",
+  "lectura": "COMPLETA",
+  "origen": "pdf_digital",
+  "paginas": 1,
+  "campos": {
+    "titular": {
+      "valor": "CASTRO GOMEZ, JAVIER",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "nif": {
+      "valor": "29289087J",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "fecha": {
+      "valor": "2025-11-28",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "horas": {
+      "valor": 60,
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "numero_registro": {
+      "valor": "378506/917810/8195194",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "numero_curso": {
+      "valor": "99622188896MAD",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "entidad": {
+      "valor": "FORMACION PREVENTIVA NORTE SL",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    }
+  },
+  "validaciones": {
+    "nif_letra_valida": true,
+    "horas_minimo_60": true,
+    "menciona_convenio_construccion": true,
+    "fecha_no_futura": true
+  },
+  "clasificacion": {
+    "tipo_detectado": "flc_60h",
+    "confianza": 0.73,
+    "candidatos": [
+      {
+        "tipo": "flc_60h",
+        "puntos": 9.5
+      },
+      {
+        "tipo": "formacion_art19",
+        "puntos": 2.5
+      },
+      {
+        "tipo": "ts_prl",
+        "puntos": 2
+      }
+    ],
+    "coincide": true
+  },
+  "autenticidad": {
+    "firmas": [],
+    "codigos_verificacion": [],
+    "qr": [],
+    "avisos": []
+  },
+  "calidad": {
+    "veredicto": "apta",
+    "avisos": []
+  },
+  "avisos": [],
+  "tiempo_ms": 0
+}

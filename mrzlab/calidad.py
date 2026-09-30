@@ -153,3 +153,67 @@ def evaluar(img: np.ndarray, umbrales: dict, caja_mrz: Caja | None = None) -> Ev
     veredicto = {"ok": "apta", "dudoso": "riesgo", "mal": "rechazar"}[peor]
     _, reflejos = manchas_reflejo(img)
     return Evaluacion(zonas, avisos, veredicto, reflejos)
+
+
+# ── Documentos A4 (escaneados o fotografiados) ───────────────────────────────
+
+MENSAJES_DOCUMENTO = {
+    **MENSAJES,
+    "reflejo": "Hay un reflejo sobre el papel: evita el flash y la luz directa",
+    "lado_min_px": "Resolución baja: escanea a 300 ppp o acerca el móvil",
+    "altura_letra_px": "El texto sale muy pequeño: acerca el móvil o escanea a más resolución",
+    "oscuros": "Parte de la hoja está en sombra",
+}
+
+
+def reflejo_papel(img: np.ndarray) -> float:
+    """Mayor mancha de brillo quemado MÁS CLARA que el papel que la rodea (fracción del área).
+
+    En un documento el papel blanco ya está cerca de 255: la medida del DNI (zonas blancas sin
+    color) lo tomaría todo por reflejo. Aquí solo cuenta un brillo que destaca sobre el papel,
+    como el de un flash o una lámpara en una foto.
+    """
+    gris = _redimensionar(_gris(img), 800)
+    papel = cv2.medianBlur(gris, 31).astype(np.int16)
+    quemado = ((gris >= 250) & (gris.astype(np.int16) - papel >= 12)).astype(np.uint8)
+    # Además, un papel que en la foto no es blanco (<230) con zonas saturadas: reflejo.
+    if float(np.median(gris)) < 230:
+        quemado |= (gris >= 252).astype(np.uint8)
+    quemado = cv2.morphologyEx(quemado, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    n, _, stats, _ = cv2.connectedComponentsWithStats(quemado, connectivity=8)
+    mayor = max((int(stats[i, cv2.CC_STAT_AREA]) for i in range(1, n)), default=0)
+    return mayor / gris.size
+
+
+def evaluar_documento(img: np.ndarray, umbrales: dict, altura_letra: float | None = None) -> Evaluacion:
+    """Calidad de una página: las métricas de la foto entera más el alto de la letra leída.
+
+    El alto de la letra decide mejor que el tamaño de la imagen: un A4 entero en una foto de
+    12 MP tiene letra suficiente; un recorte pequeño, no.
+    """
+    reglas = umbrales["documento"]
+    valores = metricas(img, "global")
+    valores["reflejo"] = round(reflejo_papel(img), 4)
+    if altura_letra is not None:
+        valores["altura_letra_px"] = round(float(altura_letra), 1)
+    zona: dict[str, dict] = {}
+    avisos: list[dict] = []
+    peor = "ok"
+    for nombre, valor in valores.items():
+        regla = reglas.get(nombre)
+        if regla is None:
+            continue
+        nivel = _nivel(valor, regla)
+        if regla.get("solo_aviso") and nivel == "mal":
+            nivel = "dudoso"
+        zona[nombre] = {"valor": valor, "nivel": nivel}
+        if nivel != "ok":
+            avisos.append({"zona": "documento", "metrica": nombre, "nivel": nivel,
+                           "mensaje": MENSAJES_DOCUMENTO[nombre]})
+            peor = max(peor, nivel, key=ORDEN.get)
+    if "brillo_bajo" in zona and "brillo_alto" in zona:
+        zona["brillo"] = zona["brillo_bajo"] if zona["brillo_bajo"]["nivel"] != "ok" else zona["brillo_alto"]
+        del zona["brillo_bajo"], zona["brillo_alto"]
+    veredicto = {"ok": "apta", "dudoso": "riesgo", "mal": "rechazar"}[peor]
+    _, reflejos = manchas_reflejo(img)
+    return Evaluacion({"documento": zona}, avisos, veredicto, reflejos)

@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OCR Doc Lab · documentos</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #5d6677; --line: #dde1e8;
+    --accent: #2957c9; --ok: #1f8a4c; --warn: #b7791f; --bad: #c53030;
+    --ok-bg: #e6f4ec; --warn-bg: #fdf3e1; --bad-bg: #fbe9e9; --code: #f0f2f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171d; --panel: #1c2028; --text: #e6e9ef; --muted: #9aa3b2; --line: #2d333e;
+      --accent: #7aa2ff; --ok: #4cc47e; --warn: #e0a84a; --bad: #f07070;
+      --ok-bg: #173325; --warn-bg: #3a2e17; --bad-bg: #3d1d1d; --code: #242a34;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 17px; margin: 0 0 12px; }
+  h3 { font-size: 15px; margin: 16px 0 8px; }
+  a { color: var(--accent); }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .fila { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  #zona { border: 2px dashed var(--line); border-radius: 10px; padding: 24px; text-align: center; color: var(--muted); cursor: pointer; }
+  #zona.encima { border-color: var(--accent); color: var(--text); }
+  button, select { font: inherit; padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line);
+                   background: var(--panel); color: var(--text); cursor: pointer; }
+  button.primario { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  .tabla-scroll { overflow-x: auto; }
+  .badge { display: inline-block; padding: 1px 9px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+  .b-COMPLETA, .b-apta, .b-true { background: var(--ok-bg); color: var(--ok); }
+  .b-INCOMPLETA, .b-riesgo, .b-null { background: var(--warn-bg); color: var(--warn); }
+  .b-ILEGIBLE, .b-OTRO_DOCUMENTO, .b-rechazar, .b-false { background: var(--bad-bg); color: var(--bad); }
+  details.res { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 10px; }
+  details.res > summary { padding: 12px 16px; cursor: pointer; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; list-style: none; }
+  details.res > summary::-webkit-details-marker { display: none; }
+  .nombre { font-weight: 600; word-break: break-all; }
+  .cuerpo { padding: 0 16px 16px; }
+  .rejilla { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; }
+  .pagina img { width: 100%; border-radius: 6px; border: 1px solid var(--line); display: block; margin-bottom: 8px; }
+  .leyenda, .aviso-info { font-size: 13px; color: var(--muted); }
+  code, td.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+  ul.avisos { margin: 6px 0 0; padding-left: 18px; }
+  .conf-baja { color: var(--warn); }
+  @media (max-width: 760px) { .rejilla { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>OCR Doc Lab · documentos</h1>
+  <p class="sub">Títulos, certificados, pólizas, contratos y fichas: lo que el servicio lee de cada documento y
+     de dónde lo saca. Todo se procesa en este ordenador y no se guarda. <a href="/">← DNI</a></p>
+
+  <section class="panel">
+    <div class="fila" style="margin-bottom:12px">
+      <label>Tipo <select id="tipo"></select></label>
+      <span class="aviso-info" id="campos-tipo"></span>
+    </div>
+    <div id="zona" tabindex="0" role="button">Arrastra aquí PDF o fotos del tipo elegido, o pulsa para elegirlos</div>
+    <input type="file" id="entrada" accept="application/pdf,image/*" multiple hidden>
+    <div class="fila" style="margin-top:12px">
+      <span>Muestra sintética:</span>
+      <button data-origen="digital">PDF digital</button>
+      <button data-origen="escaneado">PDF escaneado</button>
+      <button data-origen="foto">Foto de móvil</button>
+      <span id="estado" class="aviso-info"></span>
+      <button id="limpiar">Limpiar</button>
+    </div>
+  </section>
+
+  <section id="resultados"></section>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let tipos = [];
+let semilla = 0;
+
+async function iniciar() {
+  tipos = await fetch("/api/documentos/tipos").then((r) => r.json());
+  const grupos = { titulacion: "Titulaciones", empresa: "Empresa", trabajador: "Trabajador" };
+  $("#tipo").innerHTML = Object.entries(grupos).map(([g, n]) =>
+    `<optgroup label="${n}">${tipos.filter((t) => t.grupo === g)
+      .map((t) => `<option value="${t.tipo}">${esc(t.nombre)}</option>`).join("")}</optgroup>`).join("");
+  mostrarCampos();
+}
+
+function mostrarCampos() {
+  const t = tipos.find((x) => x.tipo === $("#tipo").value);
+  $("#campos-tipo").textContent = t ? `Campos: ${t.campos.map((c) => t.obligatorios.includes(c) ? c + "*" : c).join(", ")}  (* obligatorio)` : "";
+}
+
+async function analizar(archivo) {
+  const tipo = $("#tipo").value;
+  $("#estado").textContent = `Analizando ${archivo.name}…`;
+  const fd = new FormData();
+  fd.append("archivo", archivo);
+  fd.append("tipo", tipo);
+  const resp = await fetch("/api/documentos/analizar", { method: "POST", body: fd });
+  $("#estado").textContent = "";
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    $("#resultados").insertAdjacentHTML("afterbegin",
+      `<div class="panel"><b>${esc(archivo.name)}</b>: <span class="badge b-false">${resp.status}</span> ${esc(e.detail || "")}</div>`);
+    return;
+  }
+  pintar(await resp.json());
+}
+
+function valor(v) {
+  if (v === true) return '<span class="badge b-true">sí</span>';
+  if (v === false) return '<span class="badge b-false">no</span>';
+  if (v === null || v === undefined) return '<span class="badge b-null">—</span>';
+  return `<code>${esc(v)}</code>`;
+}
+
+function pintar(d) {
+  const lab = d.lab;
+  const campos = Object.entries(d.campos).map(([k, c]) =>
+    `<tr><td>${esc(k)}</td><td>${valor(c.valor)}</td><td>${esc(c.origen)}</td>
+     <td class="${c.confianza < 0.8 ? "conf-baja" : ""}">${c.confianza.toFixed(2)}</td><td>${c.pagina}</td></tr>`).join("")
+     || '<tr><td colspan="5" class="aviso-info">Ningún campo</td></tr>';
+  const val = Object.entries(d.validaciones).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${valor(v)}</td></tr>`).join("");
+  const aut = d.autenticidad;
+  const firmas = aut.firmas.map((f) => `firma de <b>${esc(f.firmante)}</b>: ${f.integra ? "íntegra" : "NO íntegra"}${f.modificado_tras_firmar ? ", modificada después" : ""}`);
+  const codigos = aut.codigos_verificacion.map((c) => `${c.tipo}: <code>${esc(c.codigo)}</code>`);
+  const qr = aut.qr.map((q) => `QR: <code>${esc(q)}</code>`);
+  const avisos = [...d.avisos, ...d.calidad.avisos].filter((a, i, l) => l.indexOf(a) === i);
+  const paginas = lab.paginas.map((p) => `<div class="pagina">
+      ${p.imagen ? `<img src="${p.imagen}" alt="Página ${p.numero}">` : ""}
+      <div class="leyenda">Página ${p.numero} · ${esc(p.tipo)}${p.motor ? " · " + esc(p.motor) : ""}
+      ${p.calidad ? ` · calidad <span class="badge b-${p.calidad.veredicto}">${p.calidad.veredicto}</span>` : ""}
+      · azul: líneas leídas; verde: líneas de donde sale un campo</div></div>`).join("");
+  const lineas = lab.lineas.map((l) => `<tr><td>${l.pagina}</td><td class="mono">${esc(l.texto)}${l.alternativa ? `<br><span class="aviso-info">otro motor: ${esc(l.alternativa)}</span>` : ""}</td>
+      <td>${esc(l.origen)}</td><td class="${l.confianza < 0.8 ? "conf-baja" : ""}">${l.confianza.toFixed(2)}</td></tr>`).join("");
+  $("#resultados").insertAdjacentHTML("afterbegin", `<details class="res" open>
+    <summary><span class="nombre">${esc(lab.archivo)}</span> <span>${esc(d.tipo)}</span>
+      <span class="badge b-${d.lectura}">${d.lectura}</span> <span>${esc(d.origen)}, ${d.paginas} pág.</span>
+      <span class="aviso-info">${d.tiempo_ms} ms</span>
+      <span class="aviso-info">clasificado como ${esc(d.clasificacion.tipo_detectado ?? "desconocido")} (${d.clasificacion.confianza})</span></summary>
+    <div class="cuerpo"><div class="rejilla"><div>${paginas}</div><div>
+      <h3>Campos</h3><div class="tabla-scroll"><table><tr><th>campo</th><th>valor</th><th>origen</th><th>conf.</th><th>pág.</th></tr>${campos}</table></div>
+      <h3>Validaciones</h3><table>${val || '<tr><td class="aviso-info">—</td></tr>'}</table>
+      <h3>Autenticidad</h3><div>${[...firmas, ...codigos, ...qr].join("<br>") || '<span class="aviso-info">Sin firma, CSV ni QR</span>'}</div>
+      ${avisos.length ? `<h3>Avisos</h3><ul class="avisos">${avisos.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}
+    </div></div>
+    <h3>Texto leído (${lab.lineas.length} líneas)</h3>
+    <div class="tabla-scroll"><table><tr><th>pág.</th><th>texto</th><th>origen</th><th>conf.</th></tr>${lineas}</table></div>
+    </div></details>`);
+}
+
+async function muestra(origen) {
+  const tipo = $("#tipo").value;
+  semilla += 1;
+  $("#estado").textContent = "Generando muestra…";
+  const blob = await fetch(`/api/documentos/muestra/${tipo}?origen=${origen}&semilla=${semilla}`).then((r) => r.blob());
+  const ext = origen === "foto" ? "jpg" : "pdf";
+  await analizar(new File([blob], `sintetico-${tipo}-${origen}-${semilla}.${ext}`, { type: blob.type }));
+}
+
+async function procesarArchivos(lista) {
+  for (const f of lista) await analizar(f);
+}
+
+$("#tipo").addEventListener("change", mostrarCampos);
+$("#zona").addEventListener("click", () => $("#entrada").click());
+$("#zona").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") $("#entrada").click(); });
+$("#entrada").addEventListener("change", (e) => procesarArchivos([...e.target.files]));
+["dragenter", "dragover"].forEach((ev) => $("#zona").addEventListener(ev, (e) => { e.preventDefault(); $("#zona").classList.add("encima"); }));
+["dragleave", "drop"].forEach((ev) => $("#zona").addEventListener(ev, () => $("#zona").classList.remove("encima")));
+$("#zona").addEventListener("drop", (e) => { e.preventDefault(); procesarArchivos([...e.dataTransfer.files]); });
+document.querySelectorAll("button[data-origen]").forEach((b) => b.addEventListener("click", () => muestra(b.dataset.origen)));
+$("#limpiar").addEventListener("click", () => { $("#resultados").innerHTML = ""; });
+iniciar();
+</script>
+</body>
+</html>

@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from collections.abc import Callable, Iterator
+from functools import lru_cache
 
 import cv2
 import numpy as np
@@ -116,15 +117,20 @@ class RapidOCR(Motor):
         except ImportError as e:
             return False, str(e)
 
-    def _detalle(self, img: np.ndarray) -> list[tuple[str, Caja, float]]:
-        """(texto, caja, confianza) de cada línea, en orden de lectura."""
+    @staticmethod
+    def cargar():
+        """El motor de RapidOCR (se crea una vez, sin ejecutar nada)."""
         if RapidOCR._motor is None:
             import onnxruntime
             from rapidocr_onnxruntime import RapidOCR as _R
             onnxruntime.disable_telemetry_events()  # además de ORT_DISABLE_TELEMETRY
             hilos = {"intra_op_num_threads": HILOS, "inter_op_num_threads": HILOS} if HILOS else {}
             RapidOCR._motor = _R(**hilos)
-        resultado, _ = RapidOCR._motor(img)
+        return RapidOCR._motor
+
+    def _detalle(self, img: np.ndarray) -> list[tuple[str, Caja, float]]:
+        """(texto, caja, confianza) de cada línea, en orden de lectura."""
+        resultado, _ = RapidOCR.cargar()(img)
         if not resultado:
             return []
         filas = []
@@ -227,6 +233,7 @@ class Tesseract(Motor):
             yield Intento(f"{desc} ({idioma})", [t for t in texto.splitlines() if t.strip()])
 
     @staticmethod
+    @lru_cache(maxsize=1)
     def idioma_texto() -> str:
         """Modelo para el texto general (anverso): castellano si está instalado."""
         import pytesseract

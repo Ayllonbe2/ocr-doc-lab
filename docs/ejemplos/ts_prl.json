@@ -1,0 +1,80 @@
+{
+  "tipo": "ts_prl",
+  "lectura": "COMPLETA",
+  "origen": "pdf_digital",
+  "paginas": 1,
+  "campos": {
+    "titular": {
+      "valor": "JAVIER CASTRO GOMEZ",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "fecha": {
+      "valor": "2023-10-07",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "titulo": {
+      "valor": "MASTER UNIVERSITARIO EN PREVENCION DE RIESGOS LABORALES",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "universidad": {
+      "valor": "UNIVERSIDAD DE PRUEBAS",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "titulo_oficial": {
+      "valor": true,
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "numero_registro": {
+      "valor": "2023/378506",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    }
+  },
+  "validaciones": {
+    "titulo_prevencion_riesgos_laborales": true,
+    "titulo_oficial": true,
+    "fecha_no_futura": true
+  },
+  "clasificacion": {
+    "tipo_detectado": "ts_prl",
+    "confianza": 0.86,
+    "candidatos": [
+      {
+        "tipo": "ts_prl",
+        "puntos": 9
+      },
+      {
+        "tipo": "flc_60h",
+        "puntos": 0.5
+      },
+      {
+        "tipo": "ts_riesgos",
+        "puntos": 0.5
+      }
+    ],
+    "coincide": true
+  },
+  "autenticidad": {
+    "firmas": [],
+    "codigos_verificacion": [],
+    "qr": [],
+    "avisos": []
+  },
+  "calidad": {
+    "veredicto": "apta",
+    "avisos": []
+  },
+  "avisos": [],
+  "tiempo_ms": 0
+}
