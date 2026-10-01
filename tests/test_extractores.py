@@ -193,6 +193,64 @@ def test_registro_empresa_no_confunde_numero_con_fecha():
     assert c["numero_inscripcion"] == "18/50/3146717" and c["identificador"] == "B12345674"
 
 
+def _rea_estatal(*empresa):
+    """Certificado del REA del modelo estatal: arriba, quien lo pide; tras «CERTIFICA», la empresa."""
+    return doc(("REGISTRO DE EMPRESAS ACREDITADAS", 0.3, 0.05), ("CERTIFICADO DE INSCRIPCIÓN", 0.35, 0.10),
+               ("DATOS DE LA SOLICITUD", 0.1, 0.15),
+               ("Nombre y apellidos", 0.1, 0.18, 0.2), ("LUIS GOMEZ RUIZ", 0.1, 0.195, 0.3),
+               ("Nº Identificador", 0.5, 0.18, 0.15), ("NIF", 0.5, 0.195, 0.05), ("12345678Z", 0.56, 0.195, 0.12),
+               ("Fecha de la solicitud", 0.75, 0.18, 0.15), ("07/11/2023", 0.75, 0.195, 0.1),
+               ("En representación de (si procede):", 0.1, 0.23, 0.3),
+               ("Nombre o razón social", 0.1, 0.25, 0.2), ("Nº Identificador", 0.6, 0.25, 0.15),
+               ("LA AUTORIDAD LABORAL DE COMUNIDAD DE MADRID", 0.1, 0.30, 0.5),
+               ("CERTIFICA:", 0.1, 0.33, 0.1),
+               ("Que, según los datos obrantes en el Registro de Empresas Acreditadas, la empresa cuyos datos se indican a",
+                0.1, 0.36, 0.8),
+               ("continuación figura inscrita en el Registro de", 0.1, 0.375, 0.5),
+               ("COMUNIDAD DE MADRID desde el 22/11/2016", 0.1, 0.39, 0.5),
+               *empresa)
+
+
+_REA_EMPRESA = (("Nombre o razón social", 0.1, 0.42, 0.2), ("Nº Inscripción REA", 0.6, 0.42, 0.2),
+                ("OBRAS EJEMPLO S.L.", 0.1, 0.435, 0.3), ("12/28/0123456", 0.6, 0.435, 0.15),
+                ("Nº Identificador", 0.1, 0.52, 0.15), ("CIF", 0.1, 0.535, 0.05), ("B12345674", 0.16, 0.535, 0.12))
+
+
+def test_registro_empresa_estatal_no_toma_el_nif_del_solicitante():
+    """Caso real: se devolvía el NIF de quien pedía el certificado como identificador de la empresa."""
+    c, v = extraer("registro_empresa", _rea_estatal(*_REA_EMPRESA))
+    assert c["identificador"] == "B12345674" and v["identificador_valido"]
+    assert c["razon_social"] == "OBRAS EJEMPLO S.L"
+    assert c["numero_inscripcion"] == "12/28/0123456"
+    assert c["fecha"] == date(2016, 11, 22)            # la de inscripción, no la de la solicitud
+
+
+def test_registro_empresa_estatal_sin_cif_legible_de_la_empresa_queda_vacio():
+    """Si el CIF de la empresa no se lee, nunca se usa el NIF del solicitante."""
+    c, _ = extraer("registro_empresa", _rea_estatal(*_REA_EMPRESA[:4]))
+    assert "identificador" not in c
+
+
+def test_registro_empresa_sin_cabeceras_y_dos_identificadores_queda_vacio():
+    """En una foto el OCR puede perder «DATOS DE LA SOLICITUD» y «CERTIFICA»: con el NIF del
+    solicitante y el CIF de la empresa en el texto, no se elige ninguno."""
+    d = doc(("REGISTRO DE EMPRESAS ACREDITADAS", 0.3, 0.05),
+            ("Nombre y apellidos", 0.1, 0.18, 0.2), ("LUIS GOMEZ RUIZ", 0.1, 0.195, 0.3),
+            ("NIF", 0.5, 0.195, 0.05), ("12345678Z", 0.56, 0.195, 0.12), *_REA_EMPRESA)
+    c, _ = extraer("registro_empresa", d)
+    assert "identificador" not in c
+    assert c["numero_inscripcion"] == "12/28/0123456"
+
+
+def test_registro_empresa_numero_rea_con_espacios():
+    """Modelo de Madrid (renovación): «Núm. REA: 12 28 0098249»."""
+    d = doc(("ÁREA DE REGISTRO DE EMPRESAS ACREDITADAS", 0.1, 0.05), ("Núm. REA: 12 28 0123456", 0.1, 0.10),
+            ("En relación con la solicitud de renovación de la inscripción de la empresa OBRAS EJEMPLO SL, con CIF/NIF",
+             0.1, 0.30, 0.8), ("B12345674", 0.1, 0.315, 0.12))
+    c, _ = extraer("registro_empresa", d)
+    assert c["numero_inscripcion"] == "12/28/0123456" and c["identificador"] == "B12345674"
+
+
 def test_razon_social_con_forma_juridica_mal_leida_no_se_da_por_buena():
     from mrzlab.extractores.comunes import parece_razon_social
     for bien in ("ESTRUCTURAS DE PRUEBA SL", "ESTRUCTURAS DE PRUEBA, S.L.", "OBRAS EJEMPLO S. A.",

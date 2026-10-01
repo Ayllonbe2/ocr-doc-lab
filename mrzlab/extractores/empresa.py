@@ -135,6 +135,24 @@ class SeguroRc(Extractor):
                 "fechas_coherentes": (desde.valor < hasta.valor) if desde and hasta else None}
 
 
+# Bloque de quien pide el certificado (modelo estatal) y frase que da paso a la empresa inscrita.
+# Varias formas de cada uno: en una foto el OCR puede perder alguna línea.
+_SOLICITANTE = r"DATOS\s+DE(?:L|\s+LA)\s+SOLICI(?:TUD|TANTE)|FECHA\s+DE\s+LA\s+SOLICITUD|EN\s+REPRESENTACION\s+DE"
+_EMPRESA_INSCRITA = r"\bCERTIFICA\b|CUYOS\s+DATOS|FIGURA\s+INSCRITA"
+
+
+def _tras_certifica(doc) -> list | None:
+    """Líneas posteriores a «CERTIFICA» si el documento trae un bloque con los datos del solicitante;
+    si no lo trae, None (se busca en todo el documento)."""
+    if not buscar(doc, _SOLICITANTE):
+        return None
+    h = buscar(doc, _EMPRESA_INSCRITA)
+    if not h:
+        return []          # se ve al solicitante pero no dónde empieza la empresa: no se adivina
+    ancla = h.lineas[0]
+    return [ln for ln in doc.lineas if (ln.pagina, ln.caja[1]) > (ancla.pagina, ancla.caja[1])]
+
+
 class RegistroEmpresa(Extractor):
     tipo = "registro_empresa"
     nombre = "Inscripción en el Registro de Empresas Acreditadas (construcción)"
@@ -145,13 +163,29 @@ class RegistroEmpresa(Extractor):
               r"SECTOR DE LA CONSTRUCCION": 1, r"\bR\.?E\.?A\.?\b": 1}
 
     def extraer(self, doc):
-        c = {"razon_social": razon_social(doc), "identificador": identificador_empresa(doc),
-             "fecha": fecha_documento(doc)}
-        # Nº de inscripción «NN/NN/NNNNNNN» (no una fecha: el último bloque tiene 5+ cifras).
-        r = tras_etiqueta(doc, rf"{NUM}\s*(?:DE\s+)?(?:INSCRIPCION|REGISTRO)(?:\s+REA)?\b\s*:?",
-                          r"\b(\d{2}/\d{2}/\d{5,}|\d{6,})\b")
+        # El certificado estatal empieza por «DATOS DE LA SOLICITUD»: nombre y NIF de quien lo pide
+        # (una persona o una gestoría). Los de la empresa inscrita van después de «CERTIFICA».
+        empresa = _tras_certifica(doc)
+        # Sin la etiqueta «empresa» sola, que casa con «la empresa cuyos datos se indican…».
+        razon = razon_social(doc, r"\b(?:(?:NOMBRE\s+O\s+)?RAZON\s+SOCIAL|DENOMINACION(?:\s+SOCIAL)?)\b\s*:?",
+                             lineas=empresa)
+        # Fecha de inscripción («figura inscrita … desde el 22/11/2016»). Con el bloque del solicitante,
+        # la primera fecha del documento es la de la solicitud: sin la de inscripción, vacía.
+        inscripcion = fecha_en(doc, r"FECHA\s+DE\s+INSCRIPCION|\bDESDE\s+EL\b")
+        ident = identificador_empresa(doc, empresa)
+        # Sin saber dónde empieza la empresa, si el texto trae más de un identificador (el del
+        # solicitante, el del representante…) no se puede asegurar cuál es: vacío.
+        if empresa is None and ident is not None and \
+                len(set(buscar_cifs(doc.texto_norm)) | set(buscar_nifs(doc.texto_norm))) > 1:
+            ident = None
+        c = {"razon_social": razon, "identificador": ident,
+             "fecha": inscripcion or (fecha_documento(doc) if empresa is None else None)}
+        # Nº de inscripción «NN/NN/NNNNNNN» (no una fecha: el último bloque tiene 5+ cifras). En el
+        # modelo de Madrid va como «Núm. REA: 12 28 0098249».
+        r = tras_etiqueta(doc, rf"(?:{NUM}\s*(?:DE\s+)?(?:INSCRIPCION|REGISTRO)(?:\s+REA)?|\bNUM\.?\s*REA)\b\s*:?",
+                          r"\b(\d{2}[/ ]\d{2}[/ ]\d{5,}|\d{6,})\b")
         if r:
-            c["numero_inscripcion"] = campo(r[0], r[1])
+            c["numero_inscripcion"] = campo(r[0].replace(" ", "/"), r[1])
         return c
 
     def validar(self, campos, doc):

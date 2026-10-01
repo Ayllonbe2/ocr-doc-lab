@@ -120,13 +120,14 @@ _ETIQ_RAZON = (r"\b(?:RAZON\s+SOCIAL|NOMBRE\s+O\s+RAZON\s+SOCIAL(?:\s+DE\s+LA\s+
 _SOCIEDAD = r"([A-Z0-9Ñ][A-Z0-9Ñ&.,'\- ]{2,70}?\b(?:S\.?\s?L\.?\s?U?\.?|S\.?\s?A\.?\s?U?\.?|S\.?\s?COOP\.?|S\.?\s?L\.?\s?L\.?|C\.?\s?B\.?)(?=[\s,.;]|$))"
 
 
-def razon_social(doc, etiqueta: str = _ETIQ_RAZON) -> Campo | None:
-    r = tras_etiqueta(doc, etiqueta, lineas=None)
+def razon_social(doc, etiqueta: str = _ETIQ_RAZON, lineas: list[Linea] | None = None) -> Campo | None:
+    """Como `identificador_empresa`: con `lineas`, solo en esa sección y sin buscar fuera de ella."""
+    r = tras_etiqueta(doc, etiqueta, lineas=lineas)
     if r and parece_razon_social(r[0]):
         return campo(" ".join(r[0].split()).strip(" ,.:"), r[1])
     # Si la etiqueta está pero su dato no se lee bien, vacío: cualquier otra sociedad del texto
     # (la aseguradora, el servicio de prevención…) sería un dato erróneo.
-    if any(re.search(etiqueta, norm(ln.texto)) for ln in doc.lineas):
+    if lineas is not None or any(re.search(etiqueta, norm(ln.texto)) for ln in doc.lineas):
         return None
     h = buscar(doc, _SOCIEDAD)
     return campo(" ".join(h.match.group(1).split()), h.lineas) if h else None

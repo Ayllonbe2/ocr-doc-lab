@@ -44,7 +44,8 @@ def normalizar(v) -> str:
         return "true" if v else "false"
     if isinstance(v, float) and v.is_integer():
         return str(int(v))
-    s = " ".join(sin_acentos(str(v)).split())
+    # Sin el punto final: «S.A.U» y «S.A.U.» son la misma razón social.
+    s = " ".join(sin_acentos(str(v)).split()).rstrip(".")
     return {"TRUE": "true", "FALSE": "false", "SI": "true", "NO": "false"}.get(s, s)
 
 

@@ -4,7 +4,7 @@ Plan de desarrollo para llevar el OCR del DNI a **todos los tipos de documento**
 certificados, pólizas, contratos, fichas firmadas…), con sus pruebas, y sustituir por completo un
 OCR en la nube. Diseño general en [OCR local multi-documento](ocr-multidocumento.md).
 
-**Estado (30/09/2026):** hitos H1–H5 implementados y probados (16 tipos de documento). Falta sobre
+**Estado (01/10/2026):** hitos H1–H5 implementados y probados (16 tipos de documento). Falta sobre
 todo medir y calibrar con **documentos reales** de cada tipo (§5) y lo que depende de quien llama
 (H6). Resultados de la medición en [§0](#0-estado-y-resultados).
 
@@ -35,21 +35,22 @@ todo medir y calibrar con **documentos reales** de cada tipo (§5) y lo que depe
 | H1 Núcleo de documentos | ✔ Hecho |
 | H2 Titulaciones de prevención | ✔ Hecho · probado con 3 títulos reales |
 | H3 Clasificador y fotos de documentos A4 | ✔ Hecho · falta calibrar con fotos reales |
-| H4 Documentos de empresa | ✔ Hecho · sin muestras reales todavía |
+| H4 Documentos de empresa | ✔ Hecho · probado con 14 certificados reales publicados en internet (TGSS, AEAT, REA, RC) |
 | H5 Documentos de prevención del trabajador | ✔ Hecho · probado con 2 modelos oficiales rellenados |
 | H6 Sustituir el OCR en la nube | Depende de quien llama (el servicio ya está listo) |
 
 ### Medición (`python -m herramientas.medir`)
 
-Con 2 CPU (el límite del contenedor), 30/09/2026:
+Con 2 CPU (el límite del contenedor), 01/10/2026:
 
 | Lote | Docs | COMPLETA | Campos erróneos dados por buenos | Tiempo por documento (mediana / p95) |
 |---|---|---|---|---|
-| Sintéticos, PDF digital (16 tipos × 2) | 32 | 32 (100 %) | **0** | 0,07 s / 0,13 s |
-| Sintéticos, escaneados | 32 | 31 (97 %) | **0** | 4,1 s / 7,2 s |
-| Sintéticos, foto de móvil | 32 | 26 (81 %)¹ | **0** | 4,8 s / 7,0 s |
+| Sintéticos, PDF digital (16 tipos × 2) | 32 | 32 (100 %) | **0** | 0,06 s / 0,20 s |
+| Sintéticos, escaneados | 32 | 31 (97 %) | **1**⁴ | 3,8 s / 9,7 s⁵ |
+| Sintéticos, foto de móvil | 32 | 26 (81 %)¹ | **0** | 4,6 s / 7,4 s |
 | Títulos reales (diploma FLC digital, FP fotografiado, máster escaneado) | 3 | 3 · 18/18 campos | **0** | 0,7 s digital; 17–24 s escaneado² |
 | Modelos oficiales rellenados (contrato del SEPE, registro de EPI) en formulario, aplanado y escaneado | 12 | 5³ | **0** | 1,3 s digital; 17 s escaneado² |
+| Certificados reales publicados por sus titulares (7 TGSS, 1 AEAT, 4 REA, 2 RC), PDF digital | 14 | 9⁶ | **0** | 0,14 s / 0,43 s |
 
 1. Las 2 fotos del contrato no pueden estar completas: la fecha de inicio está en la página 2.
    Sin ellas, 26/30 (87 %). Los que no salen COMPLETA quedan INCOMPLETA o ILEGIBLE, nunca con un
@@ -57,8 +58,16 @@ Con 2 CPU (el límite del contenedor), 30/09/2026:
 2. Varias páginas por OCR (el contrato del SEPE tiene 20; como mucho 5 pasan por OCR) o fotos de
    títulos enmarcados con reflejos, que necesitan los dos motores.
 3. En los registros de EPI escaneados no se puede asegurar si están firmados (queda INCOMPLETA).
+4. Un CIF «B…» leído «G…» en un REA escaneado: el dígito de control del CIF no distingue esas
+   letras. Apareció al poner en la plantilla sintética del REA el bloque del solicitante (como en
+   el modelo real), que mueve la maqueta. Pendiente: exigir que los dos motores lean lo mismo.
+5. Parte de los escaneados se midió a la vez que otros lotes: el p95 real es algo menor.
+6. INCOMPLETA: 3 TGSS del modelo antiguo («NO tiene pendiente de ingreso ninguna reclamación…»
+   no se reconoce como «al corriente») y las 2 pólizas (tomador mal leído, sin darse por bueno).
 
-Pruebas: 278 rápidas + 33 con OCR real, todas en verde; en CI se ejecutan sin red.
+Pruebas: 282 rápidas + 33 con OCR real; en CI se ejecutan sin red. Falla
+`test_foto_sin_datos_erroneos[seguro_rc]` desde el 01/10/2026 (los sintéticos usan la fecha de
+hoy): en la foto, el tomador sale con el nombre de la aseguradora y se da por bueno.
 
 ### Cambios respecto al plan inicial (aprendido al construirlo)
 
@@ -88,6 +97,12 @@ Pruebas: 278 rápidas + 33 con OCR real, todas en verde; en CI se ejecutan sin r
 - **Fechas que no son del documento.** Se excluyen la de nacimiento y las del propio modelo de
   formulario («Fecha aprobación», «Revisión», «Versión»). Si hay etiqueta de expedición pero su
   fecha es ilegible, el campo queda vacío en vez de coger otra fecha.
+- **REA: el certificado estatal trae dos identificadores.** Arriba, «Datos de la solicitud» con el
+  nombre y el NIF de quien lo pide; tras «CERTIFICA», la empresa. Con certificados reales
+  publicados en internet se devolvía el NIF del solicitante como CIF de la empresa (3 de 3). Ahora
+  la empresa se busca solo tras «CERTIFICA»; si el OCR pierde esas cabeceras y hay más de un
+  identificador en el texto, el campo queda vacío. La fecha es la de inscripción («desde el …»),
+  no la de la solicitud. También se lee el nº del modelo de Madrid («Núm. REA: 12 28 0098249»).
 - **Fichas con dos personas.** En los modelos reales el primer «D./Dª.» suele ser quien entrega o
   informa; el trabajador se busca por sus etiquetas («entrega a», «persona que se incorpora»…) y la
   firma se mide junto a la etiqueta del trabajador, sin contar trazos que invaden desde la fila de
@@ -95,16 +110,19 @@ Pruebas: 278 rápidas + 33 con OCR real, todas en verde; en CI se ejecutan sin r
 
 ### Siguiente
 
-1. **Lote real por tipo** (§5): hoy hay 3 títulos reales y 2 modelos oficiales rellenados con
-   datos ficticios. Faltan certificados TGSS/AEAT reales (se descargan al momento), pólizas, REA,
-   aperturas, contratos, reconocimientos y fichas; y fotos de móvil de todos.
-2. **Calibrar** los umbrales de calidad de documentos (`umbrales.yaml → documento`) con esas fotos.
-3. **Tiempo en fotos** (mediana 4,8 s y p95 7 s con 2 CPU): bajar el p95 por debajo de 6 s.
-4. **Cadena de confianza de las firmas** sin conexión: incluir en la imagen las raíces de
+1. **Lote real por tipo** (§5): hoy hay 3 títulos reales, 2 modelos oficiales rellenados con
+   datos ficticios y 14 certificados de empresa publicados (TGSS, AEAT, REA, RC). Faltan
+   aperturas, contratos, reconocimientos y fichas reales; y escaneos y fotos de móvil de todos.
+2. **Arreglos pendientes del lote de internet:** RC (tomador y aseguradora mal leídos; falla la
+   prueba de la foto sintética), TGSS del modelo antiguo («al corriente» y código CEA),
+   certificados de agencias tributarias autonómicas tomados por AEAT, y CIF «B»/«G» en escaneos.
+3. **Calibrar** los umbrales de calidad de documentos (`umbrales.yaml → documento`) con esas fotos.
+4. **Tiempo en fotos** (mediana 4,6 s y p95 7,4 s con 2 CPU): bajar el p95 por debajo de 6 s.
+5. **Cadena de confianza de las firmas** sin conexión: incluir en la imagen las raíces de
    confianza (FNMT, sedes de la Administración) para pasar de «íntegra» a «de confianza».
-5. **Plantillas de posiciones por emisor** (como la del anverso del DNI) para los formatos fijos
+6. **Plantillas de posiciones por emisor** (como la del anverso del DNI) para los formatos fijos
    más frecuentes (diploma FLC), para leer por posición cuando el OCR no encuentra la etiqueta.
-6. Datasets públicos (MIDV-2020 para el DNI; XFUND español para formularios) aún sin usar.
+7. Datasets públicos (MIDV-2020 para el DNI; XFUND español para formularios) aún sin usar.
 
 ---
 
@@ -310,8 +328,9 @@ El servicio ya está preparado: [x] funciona con el contenedor sin red (CI).
 Documentos públicos usados: [modelos de contrato del SEPE](https://www.sepe.es/HomeSepe/es/empresas/Contratos-de-trabajo/modelos-contrato.html),
 [registro de entrega de EPI (IRNAS-CSIC)](https://www.irnas.csic.es/wp-content/uploads/2024/06/PRL_ENTREGA-INF_-02-entrega-EPI-01-06-2024.pdf),
 [RD 1002/2010 (títulos universitarios)](https://www.boe.es/buscar/pdf/2010/BOE-A-2010-12621-consolidado.pdf).
-No se han encontrado muestras públicas de certificados TGSS/AEAT, diplomas FLC ni pólizas: son
-documentos personales. Se generan desde sus sedes (TGSS y AEAT en el momento) o se piden con
+Certificados TGSS, AEAT, REA y de seguro RC de empresas y entidades se encuentran publicados por
+sus titulares (portales de transparencia, licitaciones): 14 en `datos/internet/` con su
+`verdad.csv`. No se han encontrado diplomas FLC ni documentos del trabajador: son documentos personales. Se generan desde sus sedes (TGSS y AEAT en el momento) o se piden con
 consentimiento.
 
 ### Lo que hay que conseguir

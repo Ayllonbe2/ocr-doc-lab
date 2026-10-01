@@ -327,18 +327,26 @@ def _registro_empresa(rng, **_):
     ident = cif(rng)
     numero = f"{rng.integers(10, 52):02d}/{rng.integers(10, 52):02d}/{rng.integers(1000000, 9999999)}"
     alta = fecha(rng, 100, 2000)
+    nombre, apellidos, nif_solicitante = persona(rng)
     verdad = {"razon_social": razon, "identificador": ident, "numero_inscripcion": numero, "fecha": alta}
 
     def dibujar(h, _):
+        # Como el modelo estatal: primero quien pide el certificado (otra persona, con su NIF y una
+        # fecha posterior), después la empresa inscrita.
         h.texto(h.ancho / 2, 35, "REGISTRO DE EMPRESAS ACREDITADAS", 14, True, True)
         h.texto(h.ancho / 2, 42, "Ley 32/2006, reguladora de la subcontratación en el Sector de la Construcción", 9, centro=True)
-        h.texto(h.ancho / 2, 58, "CERTIFICADO DE INSCRIPCIÓN", 12, True, True)
-        h.campo(25, 72, 110, "RAZÓN SOCIAL", razon)
-        h.campo(145, 72, 40, "CIF", ident)
-        h.campo(25, 88, 80, "Nº DE INSCRIPCIÓN", numero)
-        h.campo(115, 88, 70, "FECHA DE INSCRIPCIÓN", num(alta))
-        h.parrafo(25, 108, "La empresa arriba indicada figura inscrita en el Registro de Empresas Acreditadas del sector "
-                           "de la construcción de esta Comunidad Autónoma.", h.ancho - 50, 10)
+        h.texto(h.ancho / 2, 52, "CERTIFICADO DE INSCRIPCIÓN", 12, True, True)
+        h.texto(25, 62, "DATOS DE LA SOLICITUD", 10, True)
+        h.campo(25, 66, 90, "NOMBRE Y APELLIDOS", f"{nombre} {apellidos}")
+        h.campo(120, 66, 35, "NIF", nif_solicitante)
+        h.campo(160, 66, 30, "FECHA DE LA SOLICITUD", num(date.today()))
+        h.texto(25, 84, "LA AUTORIDAD LABORAL CERTIFICA:", 10, True)
+        h.parrafo(25, 90, "Que la empresa cuyos datos se indican a continuación figura inscrita en el Registro de "
+                          "Empresas Acreditadas del sector de la construcción.", h.ancho - 50, 10)
+        h.campo(25, 104, 110, "NOMBRE O RAZÓN SOCIAL", razon)
+        h.campo(145, 104, 40, "CIF", ident)
+        h.campo(25, 120, 80, "Nº DE INSCRIPCIÓN", numero)
+        h.campo(115, 120, 70, "FECHA DE INSCRIPCIÓN", num(alta))
     return _pdf(dibujar), verdad
 
 
