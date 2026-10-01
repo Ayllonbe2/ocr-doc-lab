@@ -45,12 +45,12 @@ Con 2 CPU (el límite del contenedor), 01/10/2026:
 
 | Lote | Docs | COMPLETA | Campos erróneos dados por buenos | Tiempo por documento (mediana / p95) |
 |---|---|---|---|---|
-| Sintéticos, PDF digital (16 tipos × 2) | 32 | 32 (100 %) | **0** | 0,06 s / 0,20 s |
-| Sintéticos, escaneados | 32 | 31 (97 %) | **1**⁴ | 3,8 s / 9,7 s⁵ |
-| Sintéticos, foto de móvil | 32 | 26 (81 %)¹ | **0** | 4,6 s / 7,4 s |
+| Sintéticos, PDF digital (16 tipos × 2) | 32 | 32 (100 %) | **0** | 0,06 s / 0,13 s |
+| Sintéticos, escaneados | 32 | 31 (97 %) | **1**⁴ | 3,6 s / 6,8 s |
+| Sintéticos, foto de móvil | 32 | 26 (81 %)¹ | **0** | 4,3 s / 6,6 s |
 | Títulos reales (diploma FLC digital, FP fotografiado, máster escaneado) | 3 | 3 · 18/18 campos | **0** | 0,7 s digital; 17–24 s escaneado² |
 | Modelos oficiales rellenados (contrato del SEPE, registro de EPI) en formulario, aplanado y escaneado | 12 | 5³ | **0** | 1,3 s digital; 17 s escaneado² |
-| Certificados reales publicados por sus titulares (7 TGSS, 1 AEAT, 4 REA, 2 RC), PDF digital | 14 | 9⁶ | **0** | 0,14 s / 0,43 s |
+| Certificados reales publicados por sus titulares (7 TGSS, 1 AEAT, 4 REA, 2 RC), PDF digital | 14 | 10⁵ | **0** | 0,14 s / 0,52 s |
 
 1. Las 2 fotos del contrato no pueden estar completas: la fecha de inicio está en la página 2.
    Sin ellas, 26/30 (87 %). Los que no salen COMPLETA quedan INCOMPLETA o ILEGIBLE, nunca con un
@@ -61,13 +61,10 @@ Con 2 CPU (el límite del contenedor), 01/10/2026:
 4. Un CIF «B…» leído «G…» en un REA escaneado: el dígito de control del CIF no distingue esas
    letras. Apareció al poner en la plantilla sintética del REA el bloque del solicitante (como en
    el modelo real), que mueve la maqueta. Pendiente: exigir que los dos motores lean lo mismo.
-5. Parte de los escaneados se midió a la vez que otros lotes: el p95 real es algo menor.
-6. INCOMPLETA: 3 TGSS del modelo antiguo («NO tiene pendiente de ingreso ninguna reclamación…»
-   no se reconoce como «al corriente») y las 2 pólizas (tomador mal leído, sin darse por bueno).
+5. INCOMPLETA: 3 TGSS del modelo antiguo («NO tiene pendiente de ingreso ninguna reclamación…»
+   no se reconoce como «al corriente») y una póliza con el nº impreso con un espacio («44303106 7»).
 
-Pruebas: 282 rápidas + 33 con OCR real; en CI se ejecutan sin red. Falla
-`test_foto_sin_datos_erroneos[seguro_rc]` desde el 01/10/2026 (los sintéticos usan la fecha de
-hoy): en la foto, el tomador sale con el nombre de la aseguradora y se da por bueno.
+Pruebas: 287 rápidas + 33 con OCR real, todas en verde; en CI se ejecutan sin red.
 
 ### Cambios respecto al plan inicial (aprendido al construirlo)
 
@@ -103,6 +100,18 @@ hoy): en la foto, el tomador sale con el nombre de la aseguradora y se da por bu
   la empresa se busca solo tras «CERTIFICA»; si el OCR pierde esas cabeceras y hay más de un
   identificador en el texto, el campo queda vacío. La fecha es la de inscripción («desde el …»),
   no la de la solicitud. También se lee el nº del modelo de Madrid («Núm. REA: 12 28 0098249»).
+- **Póliza: sin la etiqueta del tomador no se adivina.** En una foto el OCR leyó «[FOMADOR DEL
+  SEGURO» y se devolvían el nombre y el CIF de la aseguradora (los primeros del documento, en la
+  cabecera) como los del tomador. Ahora, sin la etiqueta, los dos quedan vacíos; «FOMADOR» se
+  acepta como «TOMADOR». «Aseguradora» o «Compañía» solo cuentan como etiqueta con «:» o solas en
+  la línea («Compañía de seguros y reaseguros» no es «Compañía: …»).
+- **Pólizas en forma de carta.** Los certificados reales no son formularios: «… cuyo tomador es el
+  ILUSTRE COLEGIO / DE ABOGADOS … con CIF …» (el nombre partido en dos líneas), «El Tomador de la
+  póliza» con el nombre debajo, «Entrada en vigor» como fecha de efecto y la aseguradora como
+  «X, S.A. de Seguros y Reaseguros» (antes salía «SEGUROS Y REASEGUROS», sin nombre).
+- **Fechas en columnas.** Con «Entrada en vigor» y «Vencimiento» lado a lado y sus fechas debajo,
+  se cogía para las dos la primera fecha de la fila de abajo. Ahora una fecha bajo su etiqueta
+  tiene que estar en su columna (afecta a todos los tipos que leen fechas así).
 - **Fichas con dos personas.** En los modelos reales el primer «D./Dª.» suele ser quien entrega o
   informa; el trabajador se busca por sus etiquetas («entrega a», «persona que se incorpora»…) y la
   firma se mide junto a la etiqueta del trabajador, sin contar trazos que invaden desde la fila de
@@ -113,11 +122,11 @@ hoy): en la foto, el tomador sale con el nombre de la aseguradora y se da por bu
 1. **Lote real por tipo** (§5): hoy hay 3 títulos reales, 2 modelos oficiales rellenados con
    datos ficticios y 14 certificados de empresa publicados (TGSS, AEAT, REA, RC). Faltan
    aperturas, contratos, reconocimientos y fichas reales; y escaneos y fotos de móvil de todos.
-2. **Arreglos pendientes del lote de internet:** RC (tomador y aseguradora mal leídos; falla la
-   prueba de la foto sintética), TGSS del modelo antiguo («al corriente» y código CEA),
+2. **Arreglos pendientes del lote de internet:** nº de póliza impreso con un espacio («nº 44303106
+   7»: no se sabe si es un dígito de control, no se adivina), TGSS del modelo antiguo («al corriente» y código CEA),
    certificados de agencias tributarias autonómicas tomados por AEAT, y CIF «B»/«G» en escaneos.
 3. **Calibrar** los umbrales de calidad de documentos (`umbrales.yaml → documento`) con esas fotos.
-4. **Tiempo en fotos** (mediana 4,6 s y p95 7,4 s con 2 CPU): bajar el p95 por debajo de 6 s.
+4. **Tiempo en fotos** (mediana 4,3 s y p95 6,6 s con 2 CPU): bajar el p95 por debajo de 6 s.
 5. **Cadena de confianza de las firmas** sin conexión: incluir en la imagen las raíces de
    confianza (FNMT, sedes de la Administración) para pasar de «íntegra» a «de confianza».
 6. **Plantillas de posiciones por emisor** (como la del anverso del DNI) para los formatos fijos

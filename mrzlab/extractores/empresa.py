@@ -10,7 +10,7 @@ from datetime import date
 from ..validadores import buscar_cifs, buscar_fechas, buscar_importes, buscar_nifs
 from .base import NUM, Campo, Extractor, buscar, campo, tras_etiqueta
 from .comunes import (fecha_documento, fecha_en, identificador_empresa, identificador_valido, meses_validez,
-                      razon_social, sumar_meses)
+                      parece_razon_social, razon_social, sumar_meses)
 
 # Si el certificado no dice su validez, se asume esta (meses). Configurable.
 VALIDEZ_CERTIFICADO = int(os.getenv("OCR_VALIDEZ_CERTIFICADO_MESES", "6"))
@@ -71,6 +71,11 @@ class CertificadoAeat(_CertificadoCorriente):
               r"AL CORRIENTE": 2, r"\bCERTIFICA\b": 1, r"LEY GENERAL TRIBUTARIA|REGLAMENTO GENERAL[A-Z ,]{0,40}GESTION": 1}
 
 
+# Etiqueta del tomador. El OCR lee a veces la «T» como «F» (más con el borde de la casilla delante,
+# «[FOMADOR»); «FOMADOR» no es ninguna palabra, así que no hay confusión posible.
+_TOMADOR = r"(?<![A-Z])[TF]OMADOR"
+
+
 class SeguroRc(Extractor):
     tipo = "seguro_rc"
     nombre = "Póliza de seguro de responsabilidad civil"
@@ -84,7 +89,7 @@ class SeguroRc(Extractor):
     def _identificador_tomador(self, doc) -> Campo | None:
         """CIF del tomador: el primero tras la etiqueta «Tomador», no el de la aseguradora."""
         for i, (texto, _) in enumerate(doc.filas):
-            m = re.search(r"\bTOMADOR", texto)
+            m = re.search(_TOMADOR, texto)
             if not m:
                 continue
             for j in range(i, min(i + 4, len(doc.filas))):
@@ -94,18 +99,43 @@ class SeguroRc(Extractor):
                     return campo(encontrados[0], doc.filas[j][1])
             # Hay etiqueta pero no se lee su CIF: vacío. El de la aseguradora nunca vale.
             return None
-        return identificador_empresa(doc)
+        # Sin la etiqueta, el primer CIF de una póliza es casi siempre el de la aseguradora (va en
+        # la cabecera): no se adivina.
+        return None
+
+    @staticmethod
+    def _tomador_en_frase(doc) -> Campo | None:
+        """Certificado en forma de carta: «… cuyo tomador es el ILUSTRE COLEGIO DE ABOGADOS DE
+        GRANADA con CIF Q1863001B» (el nombre puede partirse en dos líneas)."""
+        h = buscar(doc, rf"{_TOMADOR}\s+ES\s+(?:EL\s+|LA\s+|D\.?\s+|DONA?\s+)?([A-Z0-9Ñ][^:;]{{2,90}}?)\s*,?\s+"
+                        r"CON\s+(?:C\.?I\.?F|N\.?I\.?F|DNI)\b")
+        if h and parece_razon_social(h.match.group(1)):
+            return campo(" ".join(h.match.group(1).split()).strip(" ,."), h.lineas)
+        return None
 
     def extraer(self, doc):
-        c: dict[str, Campo | None] = {"tomador": razon_social(doc, r"\bTOMADOR(?:\s+DEL\s+SEGURO)?\b\s*:?"),
-                                      "identificador": self._identificador_tomador(doc)}
-        r = tras_etiqueta(doc, r"\b(?:ENTIDAD\s+ASEGURADORA|ASEGURADORA|ASEGURADOR|COMPAÑIA)\b\s*:?")
+        # Igual que con el CIF: sin la etiqueta del tomador, la primera sociedad sería la aseguradora.
+        hay_tomador = buscar(doc, _TOMADOR) is not None
+        c: dict[str, Campo | None] = {
+            "tomador": (self._tomador_en_frase(doc)
+                        or razon_social(doc, rf"{_TOMADOR}(?:\s+DEL\s+SEGURO|\s+DE\s+LA\s+POLIZA)?\b\s*:?"))
+            if hay_tomador else None,
+            "identificador": self._identificador_tomador(doc)}
+        # «Aseguradora» o «Compañía» sueltas solo como etiqueta (con «:» o solas en la línea): en
+        # «Compañía de seguros y reaseguros» o «El asegurador garantiza…» lo que sigue no es el nombre.
+        r = tras_etiqueta(doc, r"\bENTIDAD\s+ASEGURADORA\b\s*:?|\b(?:ASEGURADORA?|COMPA[NÑ]IA(?:\s+ASEGURADORA)?)\s*:"
+                               r"|^\W*(?:ASEGURADORA?|COMPA[NÑ]IA(?:\s+ASEGURADORA)?)\W*$")
         if r and not buscar_cifs(r[0]):
             c["aseguradora"] = campo(r[0], r[1])
         else:
-            h = buscar(doc, r"\b([A-Z][A-Z ]{2,40}\s+SEGUROS(?:\s+Y\s+REASEGUROS)?(?:\s*,?\s*S\.?A\.?)?|SEGUROS\s+[A-Z][A-Z ]{2,40})\b")
-            if h:
-                c["aseguradora"] = campo(" ".join(h.match.group(1).split()), h.lineas)
+            # «SEGURCAIXA ADESLAS, S.A. DE SEGUROS Y REASEGUROS»: el nombre es lo de antes de «de seguros».
+            h = buscar(doc, r"(?:^|[.;:]\s)([A-Z][A-Z0-9Ñ .&\-]{1,50}?,?\s*S\.?\s?A\.?)\s+DE\s+SEGUROS\b") \
+                or buscar(doc, r"\b([A-Z][A-Z ]{2,40}\s+SEGUROS(?:\s+Y\s+REASEGUROS)?(?:\s*,?\s*S\.?A\.?)?"
+                               r"|SEGUROS\s+[A-Z][A-Z ]{2,40})\b")
+            # Sin nombre propio («SEGUROS Y REASEGUROS», «DE SEGUROS»), no es la aseguradora.
+            if h and not re.fullmatch(r"(?:(?:DE|Y|LA|EL|COMPANIA|COMPAÑIA)\s+)*SEGUROS(?:\s+Y\s+REASEGUROS)?",
+                                      " ".join(h.match.group(1).split())):
+                c["aseguradora"] = campo(" ".join(h.match.group(1).split()).strip(" ,."), h.lineas)
         r = tras_etiqueta(doc, rf"(?:{NUM}\s*(?:DE\s+)?POLIZA|\bPOLIZA\s+{NUM})\s*:?",
                           r"\b((?=[A-Z0-9/\-.]*\d)[A-Z0-9][A-Z0-9/\-.]{4,}[0-9A-Z])\b")
         if r:
@@ -117,7 +147,7 @@ class SeguroRc(Extractor):
             if f1 and f2:
                 c["vigencia_desde"], c["vigencia_hasta"] = campo(f1[0][0], h.lineas), campo(f2[0][0], h.lineas)
         if "vigencia_desde" not in c:
-            c["vigencia_desde"] = fecha_en(doc, r"\b(?:FECHA\s+DE\s+EFECTO|EFECTO|INICIO\s+DE\s+(?:LA\s+)?VIGENCIA|FECHA\s+DE\s+INICIO)\b", 1)
+            c["vigencia_desde"] = fecha_en(doc, r"\b(?:FECHA\s+DE\s+EFECTO|EFECTO|INICIO\s+DE\s+(?:LA\s+)?VIGENCIA|FECHA\s+DE\s+INICIO|ENTRADA\s+EN\s+VIGOR)\b", 1)
             c["vigencia_hasta"] = fecha_en(doc, r"\b(?:FECHA\s+DE\s+VENCIMIENTO|VENCIMIENTO|FIN\s+DE\s+(?:LA\s+)?VIGENCIA|FECHA\s+DE\s+FIN)\b", 1)
         for texto, lineas in doc.filas:
             if re.search(r"\bLIMITE\b[^\n]{0,30}(?:SINIESTRO|INDEMNIZACION)|SUMA\s+ASEGURADA|LIMITE\s+MAXIMO", texto):

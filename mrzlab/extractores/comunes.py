@@ -155,16 +155,26 @@ def parece_razon_social(valor: str) -> bool:
 
 
 def fecha_en(doc, patron: str, filas: int = 2) -> Campo | None:
-    """Primera fecha tras el patrón, en esa fila o en las `filas` siguientes."""
+    """Primera fecha tras el patrón, en esa fila o en las `filas` siguientes.
+
+    En las filas de debajo, solo en la columna de la etiqueta: con «Entrada en vigor» y
+    «Vencimiento» lado a lado y sus fechas debajo, la primera fecha de la fila es la de la otra.
+    """
     for i, (texto, lineas) in enumerate(doc.filas):
         m = re.search(patron, texto)
         if not m:
             continue
-        resto = [texto[m.end():]] + [doc.filas[j][0] for j in range(i + 1, min(i + 1 + filas, len(doc.filas)))]
-        for k, t in enumerate(resto):
-            fechas = buscar_fechas(t)
+        fechas = buscar_fechas(texto[m.end():])
+        if fechas:
+            return campo(fechas[0][0], lineas)
+        etiqueta = next((ln for ln in lineas if re.search(patron, norm(ln.texto))), None)
+        for j in range(i + 1, min(i + 1 + filas, len(doc.filas))):
+            debajo = doc.filas[j][1]
+            if etiqueta is not None:
+                debajo = [ln for ln in debajo if ln.caja[0] < etiqueta.x2 and ln.x2 > etiqueta.caja[0]]
+            fechas = buscar_fechas(" ".join(ln.texto for ln in debajo))
             if fechas:
-                return campo(fechas[0][0], lineas if k == 0 else doc.filas[i + k][1])
+                return campo(fechas[0][0], debajo)
     return None
 
 

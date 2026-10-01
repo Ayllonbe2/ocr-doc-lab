@@ -193,6 +193,62 @@ def test_registro_empresa_no_confunde_numero_con_fecha():
     assert c["numero_inscripcion"] == "18/50/3146717" and c["identificador"] == "B12345674"
 
 
+_POLIZA_CABECERA = (("SEGUROS EJEMPLO, S.A.", 0.1, 0.05, 0.3),
+                    ("CIF B87654325 - Compañía de seguros y reaseguros", 0.1, 0.07, 0.4),
+                    ("PÓLIZA DE SEGURO DE RESPONSABILIDAD CIVIL GENERAL", 0.2, 0.13, 0.6))
+
+
+def test_poliza_tomador_leido_con_f_por_t():
+    """Foto: el OCR leyó «[FOMADOR DEL SEGURO» (borde de la casilla y la T como F)."""
+    d = doc(*_POLIZA_CABECERA, ("[FOMADOR DEL SEGURO", 0.1, 0.25, 0.14), ("CIF", 0.71, 0.25, 0.03),
+            ("[OBRAS EJEMPLO SL", 0.1, 0.27, 0.25), ("B12345674", 0.72, 0.27, 0.08))
+    c, _ = extraer("seguro_rc", d)
+    assert c["tomador"] == "OBRAS EJEMPLO SL" and c["identificador"] == "B12345674"
+
+
+def test_poliza_sin_etiqueta_de_tomador_no_usa_la_aseguradora():
+    """Caso de una foto sintética: sin leer la etiqueta del tomador se devolvían el nombre y el CIF
+    de la aseguradora (los primeros del documento) y se daban por buenos."""
+    d = doc(*_POLIZA_CABECERA, ("XXOMADOR DEL SEGURO", 0.1, 0.25, 0.14), ("CIF", 0.71, 0.25, 0.03),
+            ("OBRAS EJEMPLO SL", 0.1, 0.27, 0.25), ("B12345674", 0.72, 0.27, 0.08))
+    c, _ = extraer("seguro_rc", d)
+    assert "tomador" not in c and "identificador" not in c
+
+
+def test_poliza_aseguradora_no_toma_la_frase_de_la_cabecera():
+    """«Compañía de seguros y reaseguros» no es la etiqueta «Compañía:» seguida del nombre."""
+    d = doc(*_POLIZA_CABECERA, ("ENTIDAD ASEGURADORA", 0.52, 0.20, 0.14), ("SEGUROS EJEMPLO, S.A.", 0.53, 0.216, 0.2))
+    c, _ = extraer("seguro_rc", d)
+    assert c["aseguradora"] == "SEGUROS EJEMPLO, S.A"
+
+
+def test_poliza_certificado_en_forma_de_carta():
+    """Certificado real: el tomador va en una frase partida en dos líneas, y la aseguradora como
+    «X, S.A. de Seguros y Reaseguros» (no «SEGUROS Y REASEGUROS»)."""
+    d = doc(("Seguros Ejemplo, S.A. de Seguros y Reaseguros, con domicilio social en Madrid, con NIF A28011864,", 0.1, 0.10, 0.8),
+            ("CERTIFICA", 0.4, 0.14, 0.1),
+            ("Que la entidad tiene contratada una póliza de responsabilidad civil con efecto 01/01/2020 y", 0.1, 0.18, 0.8),
+            ("vencimiento las 24 horas del día 31/12/2020 cuyo tomador es el ILUSTRE COLEGIO", 0.1, 0.20, 0.8),
+            ("DE EJEMPLO DE VILLAEJEMPLO con CIF Q 1234567 D.", 0.1, 0.22, 0.6))
+    c, _ = extraer("seguro_rc", d)
+    assert c["tomador"] == "ILUSTRE COLEGIO DE EJEMPLO DE VILLAEJEMPLO"
+    assert c["aseguradora"] == "SEGUROS EJEMPLO, S.A"
+    assert "SEGUROS Y REASEGUROS" not in c["aseguradora"]
+
+
+def test_poliza_tomador_de_la_poliza_y_entrada_en_vigor():
+    """Certificado real: «El Tomador de la póliza» con el nombre debajo; fechas «01.08.2024»."""
+    d = doc(("Certificado Seguro Responsabilidad Civil", 0.1, 0.05), ("Nº póliza 84805270", 0.1, 0.08, 0.3),
+            ("El Tomador de la póliza", 0.1, 0.15, 0.25), ("UNIVERSIDAD DE EJEMPLO", 0.1, 0.165, 0.3),
+            ("NIF:", 0.1, 0.18, 0.05), ("Q1234567D", 0.1, 0.195, 0.12),
+            ("Entrada en vigor", 0.1, 0.30, 0.2), ("01.08.2024", 0.1, 0.315, 0.1),
+            ("Vencimiento", 0.4, 0.30, 0.15), ("01.08.2025", 0.4, 0.315, 0.1))
+    c, v = extraer("seguro_rc", d)
+    assert c["tomador"] == "UNIVERSIDAD DE EJEMPLO" and c["identificador"] == "Q1234567D"
+    assert c["vigencia_desde"] == date(2024, 8, 1) and c["vigencia_hasta"] == date(2025, 8, 1)
+    assert v["fechas_coherentes"]
+
+
 def _rea_estatal(*empresa):
     """Certificado del REA del modelo estatal: arriba, quien lo pide; tras «CERTIFICA», la empresa."""
     return doc(("REGISTRO DE EMPRESAS ACREDITADAS", 0.3, 0.05), ("CERTIFICADO DE INSCRIPCIÓN", 0.35, 0.10),
