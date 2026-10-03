@@ -257,7 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("carpeta", type=Path)
     ap.add_argument("--verdad", type=Path, help="CSV con los datos correctos (por defecto CARPETA/verdad.csv)")
     ap.add_argument("--csv", type=Path, default=Path("mrz-lab-lote.csv"), help="CSV de salida")
-    ap.add_argument("--motores", default="", help="lista separada por comas (por defecto, todos)")
+    ap.add_argument("--motores", default="", help="lista separada por comas (por defecto, solo rapidocr)")
     ap.add_argument("--max", type=int, default=0, help="analizar como mucho N fotos")
     ap.add_argument("--procesos", type=int, default=1, help="procesos en paralelo (cada uno carga los modelos)")
     ap.add_argument("--umbrales", type=Path, default=raiz / "umbrales.yaml")
@@ -274,8 +274,8 @@ def main(argv: list[str] | None = None) -> int:
     if a.verdad and not verdad:
         print(f"Aviso: {ruta_verdad} no tiene filas", file=sys.stderr)
 
-    pedidos = {n for n in a.motores.split(",") if n} or None
-    nombres = [m.nombre for m in motores.TODOS if not pedidos or m.nombre in pedidos]
+    pedidos = {n for n in a.motores.split(",") if n} or set(analisis.MOTORES_DNI)
+    nombres = [m.nombre for m in motores.TODOS if m.nombre in pedidos]
     if all(n in nombres for n in analisis.ORDEN_COMBINADO):
         nombres.append("combinado")
     metricas = [f"{z}.{m}" for z in ("global", "mrz")

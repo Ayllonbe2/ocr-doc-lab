@@ -58,11 +58,11 @@ def test_combinado_elige_el_primero_valido():
     valido = {"valido": True, "controles": {"a": True}}
     invalido = {"valido": False, "controles": {"a": False}}
     base = {"disponible": True, "error": None, "intento": "x", "texto_bruto": []}
-    res = [{**base, "motor": "tesseract", "ms": 300, "mrz": invalido},
-           {**base, "motor": "rapidocr", "ms": 2000, "mrz": valido}]
+    res = [{**base, "motor": "rapidocr", "ms": 2000, "mrz": invalido},
+           {**base, "motor": "tesseract", "ms": 300, "mrz": valido}]
     c = analisis._combinado(res)
-    assert c["mrz"] is valido and c["ms"] == 2300 and c["intento"].startswith("rapidocr")
+    assert c["mrz"] is valido and c["ms"] == 2300 and c["intento"].startswith("tesseract")
     res[0]["mrz"] = valido
     c = analisis._combinado(res)
-    assert c["ms"] == 300 and c["intento"].startswith("tesseract")
+    assert c["ms"] == 2000 and c["intento"].startswith("rapidocr")
     assert analisis._combinado(res[:1]) is None

@@ -10,6 +10,12 @@
       "confianza": 1.0,
       "pagina": 1
     },
+    "tratamiento": {
+      "valor": "DON",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
     "nif": {
       "valor": "29289087J",
       "origen": "capa_texto",
@@ -17,7 +23,7 @@
       "pagina": 1
     },
     "fecha": {
-      "valor": "2020-10-13",
+      "valor": "2020-10-15",
       "origen": "capa_texto",
       "confianza": 1.0,
       "pagina": 1
@@ -42,6 +48,7 @@
     }
   },
   "validaciones": {
+    "titular_tras_don_dona": true,
     "nif_letra_valida": true,
     "titulo_prevencion_riesgos": true,
     "fecha_no_futura": true

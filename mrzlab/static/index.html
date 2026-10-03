@@ -18,6 +18,7 @@
     }
   }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 64px; }
@@ -67,6 +68,9 @@
   ul.avisos { margin: 6px 0 0; padding-left: 18px; }
   .aviso-info { font-size: 13px; color: var(--muted); }
   progress { width: 220px; }
+  input.declarado { font: inherit; font-size: 13px; background: var(--panel); color: var(--text);
+                    border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; width: 11em; }
+  input.declarado.largo { width: 16em; }
   select { font: inherit; background: var(--panel); color: var(--text); border: 1px solid var(--line);
            border-radius: 6px; padding: 1px 4px; }
   .lado { background: var(--code); }
@@ -127,6 +131,18 @@
     <div id="resumen-cuerpo"></div>
   </section>
 
+  <section class="panel" id="cotejo" hidden>
+    <h2>Resultado: ¿DNI apto para validar la identidad?</h2>
+    <p style="margin-top:0"><strong>APTO</strong> = pasaría el test: MRZ válida, nº de DNI y fechas iguales en las dos caras,
+      nombre y apellidos con al menos un 70 % de similitud y, si se escriben, el DNI y el nombre que pone la persona también
+      cuadran. Cualquier otro caso es <strong>NO APTO</strong>, con el motivo. La calidad de la foto no cuenta.</p>
+    <p class="aviso-info" style="margin-top:0">Comprueba que el anverso y la MRZ del reverso son del mismo DNI: nº de DNI, nacimiento,
+      apellidos, nombre y caducidad. Cada reverso se empareja con el anverso del mismo nº de DNI o, si no, con el siguiente
+      sin pareja; puedes cambiarlo en el desplegable. Del anverso se toma, de todo lo leído (cada motor, por etiqueta y por
+      posición), el valor que coincide con la MRZ.</p>
+    <div id="cotejo-cuerpo"></div>
+  </section>
+
   <section id="resultados"></section>
 </main>
 
@@ -143,6 +159,9 @@ const FRACCIONES = new Set(["oscuros", "quemados", "reflejo"]);
 const VEREDICTO = { apta: "Apta", riesgo: "Apta con riesgo", rechazar: "Rechazar" };
 let resultados = [];
 let motoresDisponibles = [];
+let ultimoId = 0;
+const parejas = {};  // id del reverso → id del anverso elegido a mano ("" = ninguno)
+const declarados = {};  // id del reverso → {dni, nombre} que pone la persona
 
 async function cargarEstado() {
   const pl = await fetch("/api/plantilla").then((r) => r.json());
@@ -159,8 +178,9 @@ async function cargarEstado() {
   motoresDisponibles = r.motores;
   $("#motores").innerHTML = r.motores.map((m) => `
     <label class="chip" title="${esc(m.nota || "")}">
-      <input type="checkbox" value="${m.nombre}" ${m.disponible ? "checked" : "disabled"}>
+      <input type="checkbox" value="${m.nombre}" ${!m.disponible ? "disabled" : m.dni ? "checked" : ""}>
       ${m.nombre} <small>${esc(m.licencia)}</small>
+      ${m.disponible && !m.dni ? '<small>(solo para comparar)</small>' : ""}
       ${m.disponible ? "" : '<span class="mal">no disponible</span>'}
       ${m.disponible && m.nota ? '<span class="dudoso">⚠</span>' : ""}
     </label>`).join("");
@@ -187,8 +207,10 @@ async function procesar(archivos) {
       const resp = await fetch("/api/analizar", { method: "POST", body: fd });
       const datos = await resp.json();
       if (!resp.ok) throw new Error(datos.detail || resp.statusText);
+      datos.id = ++ultimoId;
       resultados.push(datos);
       pintarResultado(datos);
+      pintarCotejo();
     } catch (e) {
       const d = document.createElement("div");
       d.className = "panel mal";
@@ -345,6 +367,7 @@ function svgCajas(d, motor) {
 function pintarResultado(d) {
   const el = document.createElement("details");
   el.className = "res";
+  el.dataset.id = d.id;
   el.open = true;
   const v = d.calidad.veredicto;
   const conTexto = d.motores.filter((m) => m.texto);
@@ -355,8 +378,10 @@ function pintarResultado(d) {
     <summary>
       <span class="nombre">${esc(d.archivo)}</span>
       <span class="badge lado">${LADO[d.lado] || d.lado}${d.lado_pedido === "auto" ? " (detectado)" : ""}</span>
-      <span class="badge b-${v}">${VEREDICTO[v]}</span>
+      <span class="badge b-${v} calidad" title="Calidad de la foto (solo informativa: si el cotejo aprueba, no cuenta)">Calidad: ${VEREDICTO[v]}</span>
+      <span class="decision"></span>
       ${d.motores.map((m) => `<span class="chip">${m.motor} ${iconoMotor(d, m)}</span>`).join("")}
+      ${d.orientacion?.giro ? `<span class="chip" title="Antes de analizarla, la foto se ha girado para dejar el DNI derecho (${esc(d.orientacion.metodo)})">↻ girada ${d.orientacion.giro}°</span>` : ""}
       <span class="aviso-info">${d.dimensiones.ancho}×${d.dimensiones.alto}</span>
     </summary>
     <div class="cuerpo">
@@ -366,7 +391,7 @@ function pintarResultado(d) {
             ${conTexto.map((m) => `<button data-cajas="${m.motor}" class="${m.motor === cajasDe ? "activo" : ""}">${m.motor}</button>`).join("")}
             <button data-cajas="">ninguna</button></div>` : ""}
           <div class="foto"><img src="${d.imagen_anotada}" alt="Foto analizada">${cajasDe ? svgCajas(d, cajasDe) : ""}</div>
-          <div class="leyenda">Azul: texto detectado por el OCR · Verde: MRZ localizada · Rojo: reflejos</div></div>
+          <div class="leyenda">Azul: texto detectado por el OCR · Verde: MRZ localizada · Rojo: reflejos${d.orientacion ? ` · Orientación: ${d.orientacion.giro ? `girada ${d.orientacion.giro}° (${esc(d.orientacion.metodo)})` : "ya estaba derecha"}, ${d.orientacion.ms} ms` : ""}</div></div>
         <div>${d.recorte_mrz ? `<img src="${d.recorte_mrz}" alt="Recorte de la MRZ"><div class="leyenda">Recorte de la MRZ</div>`
           : (verMrz ? '<p class="aviso-info">No se localizó la MRZ con OpenCV (RapidOCR lo intenta además con la foto entera).</p>' : "")}
           <h3>Calidad</h3>${tablaCalidad(d.calidad)}</div>
@@ -415,6 +440,161 @@ function pintarResultado(d) {
     tr.addEventListener("mouseleave", () => foto.querySelectorAll("rect.activa").forEach((x) => x.classList.remove("activa")));
   });
   $("#resultados").prepend(el);
+}
+
+// ── Cotejo anverso ↔ reverso ──────────────────────────────────────────────────
+const CAMPOS_COTEJO = { dni: "Nº DNI", fecha_nacimiento: "Nacimiento", apellidos: "Apellidos",
+  nombre: "Nombre", fecha_caducidad: "Caducidad" };
+const ESTADO_COTEJO = { coincide: ["ok", "✔ coincide"], parecido: ["dudoso", "≈ parecido"],
+  distinto: ["mal", "✘ distinto"], falta: ["dudoso", "— sin leer"] };
+const RESULTADO_COTEJO = { cuadra: ["b-apta", "Cuadra"], revisar: ["b-riesgo", "Revisar"], no_cuadra: ["b-rechazar", "No cuadra"] };
+// Resultado final, binario: solo es APTO si se aprobaría en un test; «revisar» también es NO APTO.
+const DECISION = { aprobar: ["b-apta", "✔ APTO"], revisar: ["b-rechazar", "✘ NO APTO"], rechazar: ["b-rechazar", "✘ NO APTO"] };
+let generacionCotejo = 0;
+
+// Todo lo leído en un anverso, por campo: cada motor, por etiqueta y por posición.
+function candidatosAnverso(d) {
+  const out = {};
+  for (const m of d.motores) {
+    const a = m.disponible && m.texto?.anverso;
+    if (!a) continue;
+    for (const [fuente, campos] of [["etiqueta", a.campos], ["posición", a.posicion?.campos]]) {
+      for (const k of Object.keys(CAMPOS_COTEJO)) {
+        if (campos?.[k]) (out[k] ||= []).push({ valor: campos[k], fuente: `${m.motor} · ${fuente}` });
+      }
+    }
+  }
+  return out;
+}
+
+// La MRZ del reverso: la del «combinado» si es válida; si no, la de cualquier motor válido;
+// si ninguna valida, la que tiene más controles correctos.
+function mrzDe(d) {
+  const conMrz = d.motores.filter((m) => m.disponible && m.mrz);
+  const validas = conMrz.filter((m) => m.mrz.valido);
+  const m = validas.find((x) => x.motor === "combinado") || validas[0]
+    || conMrz.sort((a, b) => Object.values(b.mrz.controles).filter(Boolean).length - Object.values(a.mrz.controles).filter(Boolean).length)[0];
+  return m ? { motor: m.motor, ...m.mrz } : null;
+}
+
+function emparejar() {
+  const anversos = resultados.filter((r) => r.lado === "anverso");
+  const reversos = resultados.filter((r) => r.lado === "reverso" && mrzDe(r));
+  const usados = new Set(Object.values(parejas).filter(Boolean).map(Number));
+  const pares = reversos.map((rev) => ({ rev, anv: rev.id in parejas ? anversos.find((a) => a.id === Number(parejas[rev.id])) : undefined }));
+  // 1.º: el anverso con el mismo nº de DNI que la MRZ.
+  for (const p of pares) {
+    if (p.rev.id in parejas) continue;
+    const dni = mrzDe(p.rev).campos.dni;
+    p.anv = dni && anversos.find((a) => !usados.has(a.id) && (candidatosAnverso(a).dni || []).some((c) => c.valor === dni));
+    if (p.anv) usados.add(p.anv.id);
+  }
+  // 2.º: el resto, por orden de subida.
+  for (const p of pares) {
+    if (p.anv || p.rev.id in parejas) continue;
+    p.anv = anversos.find((a) => !usados.has(a.id));
+    if (p.anv) usados.add(p.anv.id);
+  }
+  return { pares, anversos };
+}
+
+async function pintarCotejo() {
+  const gen = ++generacionCotejo;
+  const { pares, anversos } = emparejar();
+  const decisiones = {};
+  if (!pares.length && !anversos.length) { $("#cotejo").hidden = true; marcarDecisiones(decisiones); return; }
+  // Anversos sin reverso: sin MRZ no se puede validar.
+  const sinReverso = anversos.filter((a) => !pares.some((p) => p.anv === a)).map((a) => {
+    decisiones[a.id] = "rechazar";
+    return `<div class="motor" style="margin-bottom:12px"><div class="fila" style="margin-bottom:8px"><strong>${esc(a.archivo)}</strong>
+      <span class="aviso-info">anverso</span></div>
+      <p style="margin:0"><span class="badge b-rechazar" style="font-size:18px;padding:4px 14px">✘ NO APTO</span>
+      <span class="aviso-info">falta el reverso con la MRZ legible</span></p></div>`;
+  });
+  const bloques = await Promise.all(pares.map(async ({ rev, anv }) => {
+    const mrz = mrzDe(rev);
+    const opciones = `<option value="">— ninguno —</option>` + anversos.map((a) =>
+      `<option value="${a.id}" ${a === anv ? "selected" : ""}>${esc(a.archivo)}</option>`).join("");
+    let cuerpo = `<p style="margin:0 0 8px"><span class="badge b-rechazar" style="font-size:18px;padding:4px 14px">✘ NO APTO</span>
+      <span class="aviso-info">falta el anverso: elige con cuál comparar</span></p>`;
+    decisiones[rev.id] = "rechazar";
+    if (anv) {
+      try {
+        const resp = await fetch("/api/cotejo", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ anverso: candidatosAnverso(anv), reverso: mrz.campos, mrz_valida: mrz.valido,
+            declarado: declarados[rev.id] || null }) });
+        const c = await resp.json();
+        if (!resp.ok) throw new Error(c.detail || resp.statusText);
+        const [clase, texto] = RESULTADO_COTEJO[c.resultado];
+        const [claseD, textoD] = DECISION[c.decision];
+        decisiones[rev.id] = decisiones[anv.id] = c.decision;
+        // La calidad solo se enseña, como información, si el cotejo no aprueba: ayuda a ver
+        // por qué no se ha podido leer o cotejar (foto borrosa, reflejo…).
+        const calidadMala = [anv, rev].filter((x) => x.calidad.veredicto !== "apta");
+        const infoCalidad = c.decision !== "aprobar" && calidadMala.length ? `<div class="aviso-info" style="margin:0 0 8px">
+          <strong>Calidad de las fotos (información):</strong><ul class="avisos">${calidadMala.map((x) =>
+            `<li>${x.lado} (${esc(x.archivo)}): ${VEREDICTO[x.calidad.veredicto]}${x.calidad.avisos.length ? " — " + x.calidad.avisos.map((a) => esc(a.mensaje)).join("; ") : ""}</li>`).join("")}</ul></div>` : "";
+        const ESTADO_DECL = { ...ESTADO_COTEJO, falta: ["dudoso", "— sin leer en las fotos"] };
+        const decl = Object.entries(c.declarado || {});
+        cuerpo = `<p style="margin:0 0 8px"><span class="badge ${claseD}" style="font-size:18px;padding:4px 14px">${textoD}</span>
+          <span class="aviso-info">${esc(c.motivo)}</span> · anverso ↔ reverso: <span class="badge ${clase}">${texto}</span></p>
+          ${infoCalidad}
+          ${decl.length ? `<div class="tabla-scroll"><table style="margin-bottom:8px">
+            <tr><th>Declarado</th><th>Valor</th><th>Leído en el DNI</th><th>Resultado</th></tr>
+            ${decl.map(([k, f]) => { const [cl, tx] = ESTADO_DECL[f.estado]; return `<tr><th>${k === "dni" ? "Nº DNI" : "Nombre completo"}</th>
+              <td>${esc(f.declarado)}</td><td>${f.leido ? esc(f.leido) : "—"}</td>
+              <td class="${cl}">${tx}${f.similitud != null ? ` <span class="aviso-info">· ${Math.round(f.similitud * 100)} % de similitud (mínimo 70 %)</span>` : ""}</td></tr>`; }).join("")}
+          </table></div>` : ""}
+          <div class="tabla-scroll"><table>
+          <tr><th>Campo</th><th>Anverso</th><th>Reverso (MRZ)</th><th>Resultado</th></tr>
+          ${Object.entries(CAMPOS_COTEJO).map(([k, nombre]) => {
+            const f = c.campos[k];
+            const [cl, tx] = ESTADO_COTEJO[f.estado];
+            const otros = f.otros_anverso.length ? ` title="Otras lecturas del anverso: ${esc(f.otros_anverso.join(" · "))}"` : "";
+            return `<tr><th>${nombre}</th>
+              <td${otros}>${f.anverso ? esc(f.anverso) : "—"}${f.fuente ? ` <span class="aviso-info">· ${esc(f.fuente)}</span>` : ""}${f.otros_anverso.length ? ' <span class="aviso-info">(+' + f.otros_anverso.length + ")</span>" : ""}</td>
+              <td>${f.reverso ? esc(f.reverso) : "—"}</td>
+              <td class="${cl}">${tx}${f.nota ? ` <span class="aviso-info">· ${esc(f.nota)}</span>` : ""}</td></tr>`;
+          }).join("")}</table></div>
+          ${mrz.valido ? "" : '<p class="dudoso">La MRZ no es válida (no cuadran todos los dígitos de control): los datos del reverso pueden estar mal leídos.</p>'}
+          <p class="aviso-info" style="margin:4px 0 0">En la MRZ, el nº de DNI y las fechas tienen dígito de control; el nombre y los apellidos no.
+            Pasa el ratón por un valor del anverso con (+N) para ver las otras lecturas.</p>`;
+      } catch (e) {
+        cuerpo = `<p class="mal">Error al cotejar: ${esc(e.message)}</p>`;
+      }
+    }
+    return `<div class="motor" style="margin-bottom:12px">
+      <div class="fila" style="margin-bottom:8px"><strong>${esc(rev.archivo)}</strong>
+        <span class="aviso-info">reverso · MRZ de ${esc(mrz.motor)} ${mrz.valido ? '<span class="ok">✔</span>' : '<span class="mal">✘</span>'}</span>
+        <label class="chip">Anverso <select data-reverso="${rev.id}">${opciones}</select></label></div>
+      <div class="fila" style="margin-bottom:8px;gap:8px"><span class="aviso-info">Datos que pone la persona (opcional):</span>
+        <input class="declarado" data-reverso="${rev.id}" data-campo="dni" placeholder="Nº DNI" value="${esc(declarados[rev.id]?.dni || "")}">
+        <input class="declarado largo" data-reverso="${rev.id}" data-campo="nombre" placeholder="Nombre y apellidos" value="${esc(declarados[rev.id]?.nombre || "")}"></div>
+      ${cuerpo}</div>`;
+  }));
+  if (gen !== generacionCotejo) return;  // ya hay un cotejo más reciente
+  $("#cotejo").hidden = false;
+  $("#cotejo-cuerpo").innerHTML = bloques.join("") + sinReverso.join("");
+  marcarDecisiones(decisiones);
+  $("#cotejo-cuerpo").querySelectorAll("select[data-reverso]").forEach((s) => s.addEventListener("change", () => {
+    parejas[s.dataset.reverso] = s.value;
+    pintarCotejo();
+  }));
+  $("#cotejo-cuerpo").querySelectorAll("input.declarado").forEach((i) => i.addEventListener("change", () => {
+    (declarados[i.dataset.reverso] ||= {})[i.dataset.campo] = i.value.trim();
+    pintarCotejo();
+  }));
+}
+
+// En la cabecera de cada foto: la decisión del cotejo, junto al veredicto de calidad.
+function marcarDecisiones(decisiones) {
+  document.querySelectorAll("details.res[data-id]").forEach((el) => {
+    const d = decisiones[el.dataset.id];
+    const span = el.querySelector(".decision");
+    span.innerHTML = d ? `<span class="badge ${DECISION[d][0]}" title="Resultado del cotejo anverso ↔ reverso">${DECISION[d][1]}</span>` : "";
+    // Si el cotejo aprueba, la calidad de la foto no cuenta: no se enseña en la cabecera.
+    el.querySelector(".calidad").hidden = d === "aprobar";
+  });
 }
 
 function pct(a, b) { return b ? Math.round((a / b) * 100) + " %" : "—"; }
@@ -514,7 +694,9 @@ $("#muestras").addEventListener("click", async () => {
   procesar(archivos);
 });
 $("#limpiar").addEventListener("click", () => {
-  resultados = []; $("#resultados").innerHTML = ""; pintarResumen();
+  resultados = []; $("#resultados").innerHTML = ""; pintarResumen(); pintarCotejo();
+  for (const k of Object.keys(parejas)) delete parejas[k];
+  for (const k of Object.keys(declarados)) delete declarados[k];
   $("#estado").textContent = ""; $("#csv").disabled = $("#limpiar").disabled = true;
 });
 cargarEstado();

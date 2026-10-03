@@ -10,8 +10,14 @@
       "confianza": 1.0,
       "pagina": 1
     },
+    "tratamiento": {
+      "valor": "DOÑA",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
     "fecha": {
-      "valor": "2023-10-07",
+      "valor": "2023-10-09",
       "origen": "capa_texto",
       "confianza": 1.0,
       "pagina": 1
@@ -42,24 +48,25 @@
     }
   },
   "validaciones": {
+    "titular_tras_don_dona": true,
     "titulo_prevencion_riesgos_laborales": true,
     "titulo_oficial": true,
     "fecha_no_futura": true
   },
   "clasificacion": {
     "tipo_detectado": "ts_prl",
-    "confianza": 0.86,
+    "confianza": 0.64,
     "candidatos": [
       {
         "tipo": "ts_prl",
         "puntos": 9
       },
       {
-        "tipo": "flc_60h",
-        "puntos": 0.5
+        "tipo": "titulo_tecnico",
+        "puntos": 4
       },
       {
-        "tipo": "ts_riesgos",
+        "tipo": "flc_60h",
         "puntos": 0.5
       }
     ],

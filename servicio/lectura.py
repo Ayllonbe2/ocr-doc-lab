@@ -1,6 +1,6 @@
 """Lectura de cada cara del DNI. Todo en memoria: nada se guarda.
 
-- Reverso: la MRZ (Tesseract y, si no da una MRZ válida, RapidOCR), sobre la foto original y,
+- Reverso: la MRZ con RapidOCR, sobre la foto original y,
   si hace falta, sobre la tarjeta enderezada.
 - Anverso: el nº de DNI (con letra correcta) y el nº de soporte, junto a su etiqueta y, si hay
   plantilla de posiciones, también por la posición de cada campo en la tarjeta.
@@ -20,10 +20,9 @@ from PIL import Image, ImageOps
 from mrzlab import anverso, calidad, deteccion, motores, mrz, plantilla, preproceso
 
 UMBRALES = Path(os.getenv("UMBRALES", Path(__file__).resolve().parent.parent / "umbrales.yaml"))
-# Primero el motor más rápido; el siguiente solo si el anterior no consigue una MRZ válida.
-ORDEN_MRZ = ("tesseract", "rapidocr")
-# Anverso: RapidOCR lee mejor el texto general; Tesseract, por posición.
-ORDEN_ANVERSO = ("rapidocr", "tesseract")
+# El DNI se lee solo con RapidOCR: en las pruebas con fotos reales lee mejor que Tesseract.
+ORDEN_MRZ = ("rapidocr",)
+ORDEN_ANVERSO = ("rapidocr",)
 
 
 class ImagenInvalida(ValueError):

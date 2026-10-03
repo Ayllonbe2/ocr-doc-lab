@@ -135,3 +135,34 @@ def test_mayoria_de_escaneados_completos():
         pdf, _ = sd.generar(tipo, rng)
         completos += documentos.procesar(sd.escanear(pdf, rng), tipo).lectura == documentos.COMPLETA
     assert completos / len(TIPOS) >= 0.8, completos
+
+
+@pytest.mark.parametrize("titulo,profesion,habilita", [
+    ("Graduado en Ingeniería en Tecnologías Industriales", "ingeniero_industrial", True),
+    ("Ingeniero Industrial", "ingeniero_industrial", True),
+    ("Ingeniero Técnico Industrial", "ingeniero_industrial", True),
+    ("Arquitecto", "arquitecto", True),
+    ("Arquitecto Técnico", "arquitecto_tecnico", True),
+    ("Graduado en Ingeniería de Edificación", "arquitecto_tecnico", True),
+    ("Graduado en Arquitectura Técnica", "arquitecto_tecnico", True),
+    ("Ingeniero de Caminos, Canales y Puertos", "otra_ingenieria", False),
+])
+def test_titulo_tecnico_profesion(titulo, profesion, habilita):
+    pdf, _ = sd.generar("titulo_tecnico", np.random.default_rng(18), titulo=titulo, profesion=profesion)
+    r = documentos.procesar(pdf, "titulo_tecnico")
+    assert r.campos["profesion"].valor == profesion, r.campos.get("titulo")
+    assert r.validaciones["habilita_coordinador_seguridad_salud"] is habilita
+
+
+@pytest.mark.parametrize("horas,esperado", [(200, True), (60, False)])
+def test_curso_coordinador_horas(horas, esperado):
+    pdf, _ = sd.generar("curso_coordinador_ss", np.random.default_rng(19), horas=horas)
+    r = documentos.procesar(pdf, "curso_coordinador_ss")
+    assert r.validaciones["horas_minimo_200"] is esperado
+    assert r.validaciones["curso_coordinador_seguridad_salud"] is True
+
+
+def test_master_prl_no_es_titulo_tecnico():
+    pdf, _ = sd.generar("ts_prl", np.random.default_rng(20))
+    r = documentos.procesar(pdf, "titulo_tecnico")
+    assert "profesion" not in r.campos and r.lectura != documentos.COMPLETA

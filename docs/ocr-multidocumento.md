@@ -4,7 +4,7 @@ Propuesta para llevar lo que hace el lab con el DNI a **otros documentos** (titu
 certificados, pólizas…) y servirlo como un **servicio OCR propio, sin nube y solo en localhost**, con un endpoint por
 tipo de documento.
 
-Estado: implementado (16 tipos de documento). Qué falta y cómo se ha medido: [Roadmap](roadmap.md).
+Estado: implementado (18 tipos de documento). Qué falta y cómo se ha medido: [Roadmap](roadmap.md).
 
 ## Por qué
 

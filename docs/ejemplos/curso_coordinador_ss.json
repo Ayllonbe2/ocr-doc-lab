@@ -1,11 +1,17 @@
 {
-  "tipo": "flc_60h",
+  "tipo": "curso_coordinador_ss",
   "lectura": "COMPLETA",
   "origen": "pdf_digital",
   "paginas": 1,
   "campos": {
     "titular": {
-      "valor": "CASTRO GOMEZ, JAVIER",
+      "valor": "JAVIER CASTRO GOMEZ",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "tratamiento": {
+      "valor": "DON",
       "origen": "capa_texto",
       "confianza": 1.0,
       "pagina": 1
@@ -23,43 +29,31 @@
       "pagina": 1
     },
     "horas": {
-      "valor": 60,
-      "origen": "capa_texto",
-      "confianza": 1.0,
-      "pagina": 1
-    },
-    "numero_registro": {
-      "valor": "378506/917810/8195194",
-      "origen": "capa_texto",
-      "confianza": 1.0,
-      "pagina": 1
-    },
-    "numero_curso": {
-      "valor": "99622188896MAD",
+      "valor": 200,
       "origen": "capa_texto",
       "confianza": 1.0,
       "pagina": 1
     },
     "entidad": {
-      "valor": "FORMACION PREVENTIVA NORTE SL",
+      "valor": "FORMACION TECNICA NORTE SL",
       "origen": "capa_texto",
       "confianza": 1.0,
       "pagina": 1
     }
   },
   "validaciones": {
-    "titular_tras_don_dona": false,
+    "titular_tras_don_dona": true,
     "nif_letra_valida": true,
-    "horas_minimo_60": true,
-    "menciona_convenio_construccion": true,
+    "curso_coordinador_seguridad_salud": true,
+    "horas_minimo_200": true,
     "fecha_no_futura": true
   },
   "clasificacion": {
-    "tipo_detectado": "flc_60h",
+    "tipo_detectado": "curso_coordinador_ss",
     "confianza": 0.73,
     "candidatos": [
       {
-        "tipo": "flc_60h",
+        "tipo": "curso_coordinador_ss",
         "puntos": 9.5
       },
       {
@@ -67,8 +61,8 @@
         "puntos": 2.5
       },
       {
-        "tipo": "ts_prl",
-        "puntos": 2
+        "tipo": "plan_seguridad_salud",
+        "puntos": 2.0
       }
     ],
     "coincide": true

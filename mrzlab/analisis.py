@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-from . import anverso, calidad, deteccion, motores, mrz, plantilla, preproceso
+from . import anverso, calidad, deteccion, motores, mrz, orientacion, plantilla, preproceso
 
 
 class ImagenInvalida(ValueError):
@@ -27,9 +27,13 @@ def decodificar(datos: bytes) -> np.ndarray:
     return cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
 
 
-# Orden del resultado «combinado»: primero el motor más rápido; el siguiente solo si el
-# anterior no consigue una MRZ válida.
-ORDEN_COMBINADO = ["tesseract", "rapidocr"]
+# El DNI se lee solo con RapidOCR (en las pruebas con fotos reales lee mejor que Tesseract).
+# Tesseract se puede pedir a mano para comparar; sigue usándose en los demás documentos.
+MOTORES_DNI = ("rapidocr",)
+
+# Orden del resultado «combinado» (solo si se piden los dos motores): RapidOCR y, si no
+# consigue una MRZ válida, Tesseract.
+ORDEN_COMBINADO = ["rapidocr", "tesseract"]
 
 
 def _es_valida(intento: motores.Intento) -> bool:
@@ -105,7 +109,7 @@ def _leer_con_motor(m: motores.Motor, variantes: _Variantes) -> dict:
 
 
 def _combinado(resultados: list[dict]) -> dict | None:
-    """Tesseract y, si no valida, RapidOCR: lo que costaría en producción usarlos en cadena."""
+    """RapidOCR y, si no valida, Tesseract: lo que costaría usarlos en cadena."""
     por_motor = {r["motor"]: r for r in resultados if r.get("disponible")}
     if not all(n in por_motor for n in ORDEN_COMBINADO):
         return None
@@ -168,16 +172,23 @@ def _decidir_lado(resultados: list[dict]) -> str:
 
 def analizar(img: np.ndarray, umbrales: dict, pedidos: set[str] | None = None,
              lado: str = "auto", con_texto: bool = True,
-             imagenes: dict | None = None) -> tuple[dict, calidad.Evaluacion]:
-    """lado: «reverso» solo lee la MRZ, «anverso» solo los campos impresos, «auto» ambos.
+             imagenes: dict | None = None, orientar: bool = True) -> tuple[dict, calidad.Evaluacion]:
+    """pedidos: motores a usar; sin pedir ninguno, MOTORES_DNI.
+    lado: «reverso» solo lee la MRZ, «anverso» solo los campos impresos, «auto» ambos.
 
     con_texto: además lee todo el texto de la foto entera con cada motor (lo que se enseña
     en la página y de donde salen los campos del anverso).
-    imagenes: si se pasa, se rellena con imágenes intermedias para la página (la tarjeta
-    enderezada con las zonas de la plantilla).
+    imagenes: si se pasa, se rellena con imágenes intermedias para la página (la foto ya
+    orientada y la tarjeta enderezada con las zonas de la plantilla).
+    orientar: antes de nada, girar la foto (0/90/180/270°) hasta dejar el DNI derecho.
     """
     if lado not in LADOS:
         raise ValueError(f"lado debe ser uno de {LADOS}")
+    giro = None
+    if orientar:
+        img, giro = orientacion.orientar(img)
+    if imagenes is not None:
+        imagenes["orientada"] = img
     buscar_mrz = lado != "anverso"
     con_texto = con_texto or lado != "reverso"
 
@@ -185,6 +196,7 @@ def analizar(img: np.ndarray, umbrales: dict, pedidos: set[str] | None = None,
     evaluacion = calidad.evaluar(img, umbrales, caja)
     variantes = _Variantes(img, caja)
 
+    pedidos = pedidos or set(MOTORES_DNI)
     resultados = []
     for m in motores.TODOS:
         if pedidos and m.nombre not in pedidos:
@@ -209,6 +221,7 @@ def analizar(img: np.ndarray, umbrales: dict, pedidos: set[str] | None = None,
         "lado": lado_final,
         "lado_pedido": lado,
         "dimensiones": {"ancho": img.shape[1], "alto": img.shape[0]},
+        "orientacion": giro.a_dict() if giro else None,
         "caja_mrz": caja,
         "calidad": evaluacion.a_dict(),
         "motores": resultados,

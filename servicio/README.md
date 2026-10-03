@@ -1,6 +1,6 @@
 # Servicio OCR
 
-API HTTP de producción, sin estado, sobre el núcleo de `mrzlab/`: el DNI y 16 tipos de documento
+API HTTP de producción, sin estado, sobre el núcleo de `mrzlab/`: el DNI y 18 tipos de documento
 más (titulaciones, documentos de empresa y del trabajador). **Solo en localhost**: escucha en
 `127.0.0.1` (o en la red interna de Docker) y no se expone. Diseño en
 [OCR local multi-documento](../docs/ocr-multidocumento.md) y plan en [Roadmap](../docs/roadmap.md).
@@ -15,7 +15,7 @@ local. `GET /health` no pide clave.
 ## DNI: `POST /v1/dni/verificar`
 
 Verifica un DNI español a partir de las fotos del **anverso** y del **reverso** y del nº de DNI
-que indica el usuario, con OCR local (Tesseract + RapidOCR, sin nube).
+que indica el usuario, con OCR local (RapidOCR, sin nube).
 
 **No se almacena ninguna imagen.** Las fotos se procesan en memoria, no se escriben en disco (ni
 como fichero temporal de la subida) ni se registran en logs, y se descartan al responder. En los

@@ -467,10 +467,64 @@ def _ficha(titulo: str, ley: str, cuerpo: str):
     return generar_ficha
 
 
+def _titulo_tecnico(rng, titulo="Graduado en Ingeniería en Tecnologías Industriales", profesion="ingeniero_industrial", **_):
+    nombre, apellidos, dni = persona(rng)
+    expedicion = fecha(rng, 200, 4000)
+    rnt = f"{expedicion.year}/{rng.integers(100000, 999999)}"
+    universidad = f"Universidad de {rng.choice(['Ejemplo', 'Villaficticia', 'Pruebas'])}"
+    verdad = {"titular": f"{nombre} {apellidos}", "fecha": expedicion, "numero_registro": rnt,
+              "universidad": universidad.upper(), "titulo_oficial": True, "profesion": profesion,
+              "titulo": sintetico_sin_tildes(titulo).upper()}
+
+    def dibujar(h, _):
+        h.orla()
+        h.texto(h.ancho / 2, 28, "Felipe VI, Rey de España", 18, True, True, (0.2, 0.3, 0.55))
+        h.texto(h.ancho / 2, 40, "y en su nombre el", 10, centro=True)
+        h.texto(h.ancho / 2, 48, f"Rector de la {universidad}", 14, True, True)
+        h.texto(h.ancho / 2, 58, "Considerando que, conforme a las disposiciones y circunstancias previstas por la legislación vigente,", 9.5, centro=True)
+        h.texto(h.ancho / 2, 72, f"Don {nombre.title()} {apellidos.title()}", 20, True, True)
+        h.texto(h.ancho / 2, 82, f"nacido el día {en_letra(date(1980, 6, 9))} en Madrid, de nacionalidad española,", 10, centro=True)
+        h.texto(h.ancho / 2, 89, "ha superado los estudios universitarios oficiales conducentes al título de", 10, centro=True)
+        h.texto(h.ancho / 2, 101, titulo, 15, True, True)
+        h.texto(h.ancho / 2, 110, f"por la {universidad}", 11, centro=True)
+        h.texto(h.ancho / 2, 118, "expide el presente título oficial con validez en todo el territorio nacional.", 10, centro=True)
+        h.texto(h.ancho / 2, 130, f"Dado en Madrid, a {en_letra(expedicion)}", 11, centro=True)
+        h.texto(40, 176, "Registro Nacional de Títulos", 8)
+        h.texto(40, 181, rnt, 9)
+    return _pdf(dibujar, apaisado=True), verdad
+
+
+def sintetico_sin_tildes(texto: str) -> str:
+    return texto.translate(str.maketrans("ÁÉÍÓÚáéíóú", "AEIOUaeiou"))
+
+
+def _curso_coordinador(rng, horas=200, **_):
+    nombre, apellidos, dni = persona(rng)
+    fin = fecha(rng)
+    entidad = f"FORMACION TECNICA {rng.choice(['NORTE', 'SUR', 'CENTRO'])} SL"
+    verdad = {"titular": f"{nombre} {apellidos}", "nif": dni, "horas": horas, "entidad": entidad, "fecha": fin}
+
+    def dibujar(h, _):
+        h.orla()
+        h.texto(h.ancho / 2, 32, "CERTIFICADO DE APROVECHAMIENTO", 20, True, True, (0.2, 0.3, 0.55))
+        h.texto(h.ancho / 2, 50, f"D. {nombre.title()} {apellidos.title()}, con NIF {dni},", 12, centro=True)
+        h.texto(h.ancho / 2, 62, "ha superado con aprovechamiento el curso de", 12, centro=True)
+        h.texto(h.ancho / 2, 74, "COORDINADOR EN MATERIA DE SEGURIDAD Y SALUD EN OBRAS DE CONSTRUCCIÓN", 13, True, True)
+        h.parrafo(25, 88, f"Curso impartido por {entidad}, con una duración de {horas} horas, conforme al Real Decreto "
+                          f"1627/1997 y a la Guía técnica del INSST, del {en_letra(fin - timedelta(days=90))} "
+                          f"al {en_letra(fin)}.", h.ancho - 50, 10.5)
+        h.texto(h.ancho / 2, 125, f"Madrid, a {en_letra(fin)}", 11, centro=True)
+        h.texto(40, 150, "Firma y sello de la entidad", 9)
+        h.firma(45, 165, rng)
+    return _pdf(dibujar, apaisado=True), verdad
+
+
 PLANTILLAS = {
     "flc_60h": _flc_60h,
     "ts_riesgos": _ts_riesgos,
     "ts_prl": _ts_prl,
+    "titulo_tecnico": _titulo_tecnico,
+    "curso_coordinador_ss": _curso_coordinador,
     "certificado_tgss": _certificado_tgss,
     "certificado_aeat": _certificado_aeat,
     "seguro_rc": _seguro_rc,

@@ -13,7 +13,7 @@ import numpy as np
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 
-from . import analisis, calidad, motores, plantilla, sintetico
+from . import analisis, calidad, cotejo, motores, plantilla, sintetico
 
 RAIZ = Path(__file__).resolve().parent
 UMBRALES_RUTA = Path(os.getenv("UMBRALES", RAIZ.parent / "umbrales.yaml"))
@@ -51,7 +51,8 @@ def estado():
     lista = []
     for m in motores.TODOS:
         ok, nota = m.disponible()
-        lista.append({"nombre": m.nombre, "licencia": m.licencia, "disponible": ok, "nota": nota})
+        lista.append({"nombre": m.nombre, "licencia": m.licencia, "disponible": ok, "nota": nota,
+                      "dni": m.nombre in analisis.MOTORES_DNI})
     return {"motores": lista, "umbrales": calidad.cargar_umbrales(UMBRALES_RUTA)}
 
 
@@ -88,6 +89,7 @@ async def analizar(archivo: UploadFile = File(...), motores_sel: str = Form(""),
     imagenes: dict = {}
     resultado, evaluacion = analisis.analizar(img, umbrales, pedidos, lado, imagenes=imagenes)
     caja = resultado["caja_mrz"]
+    img = imagenes.get("orientada", img)  # las cajas van sobre la foto ya girada
     tarjeta = imagenes.get("tarjeta")
     return {
         "archivo": archivo.filename,
@@ -97,6 +99,20 @@ async def analizar(archivo: UploadFile = File(...), motores_sel: str = Form(""),
         if caja else None,
         "tarjeta_zonas": _jpeg_b64(_dibujar_zonas(*tarjeta), 900) if tarjeta else None,
     }
+
+
+@app.post("/api/cotejo")
+def cotejar(cuerpo: dict = Body(...)):
+    """Compara los campos leídos en el anverso con los de la MRZ (no recibe imágenes)."""
+    anv, rev = cuerpo.get("anverso"), cuerpo.get("reverso")
+    if not isinstance(anv, dict) or not isinstance(rev, dict):
+        raise HTTPException(400, "Hacen falta «anverso» (candidatos por campo) y «reverso» (campos de la MRZ)")
+    try:
+        decl = cuerpo.get("declarado")
+        return cotejo.cotejar(anv, rev, mrz_valida=bool(cuerpo.get("mrz_valida", True)),
+                              declarado=decl if isinstance(decl, dict) else None)
+    except (AttributeError, TypeError) as e:
+        raise HTTPException(400, f"Formato no válido: {e}")
 
 
 def _dibujar_zonas(tarjeta: np.ndarray, zonas: dict, propuesta: dict) -> np.ndarray:

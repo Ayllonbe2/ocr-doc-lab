@@ -5,6 +5,8 @@ nombres, NIF y CIF son inventados.
 """
 from datetime import date
 
+import pytest
+
 from mrzlab.documentos import Documento
 from mrzlab.extractores import REGISTRO
 from mrzlab.lineas import Linea, Pagina
@@ -47,7 +49,7 @@ def test_flc_completo():
     assert c["nif"] == "12345678Z" and c["horas"] == 60 and c["fecha"] == date(2025, 3, 14)
     assert c["entidad"] == "FORMACION EJEMPLO SL"      # la frase está partida en dos líneas
     assert v == {"nif_letra_valida": True, "horas_minimo_60": True, "menciona_convenio_construccion": True,
-                 "fecha_no_futura": True}
+                 "fecha_no_futura": True, "titular_tras_don_dona": False}   # «D./Dña.» no dice cuál
 
 
 def test_flc_numero_registro_formato_con_barras():
@@ -130,6 +132,17 @@ def test_master_oficial():
     assert c["universidad"] == "UNIVERSIDAD DE EJEMPLO" and c["titular"] == "LUCIA ORTEGA PEÑA"
     assert c["titulo_oficial"] is True and c["numero_registro"] == "2021/123456" and c["fecha"] == date(2021, 7, 5)
     assert v["titulo_prevencion_riesgos_laborales"] is True
+
+
+def test_master_titular_con_ruido_del_borde():
+    # El borde decorativo del título deja restos del OCR en la fila del nombre («… . 2»).
+    d = doc(("Considerando que, conforme a las disposiciones vigentes,", 0.2, 0.3, 0.6),
+            ("Don Miguel Ángel Pérez Cuadro . 2", 0.25, 0.35, 0.5),
+            ("nacido el día 27 de abril de 1979 en Córdoba, de nacionalidad española,", 0.25, 0.38, 0.5),
+            ("Máster Universitario en Prevención de Riesgos Laborales", 0.2, 0.45, 0.6),
+            ("por la Universidad de Ejemplo", 0.3, 0.5), ("Dado en Madrid, a 3 de octubre de 2017", 0.35, 0.6))
+    c, _ = extraer("ts_prl", d)
+    assert c["titular"] == "MIGUEL ANGEL PEREZ CUADRO"
 
 
 def test_master_propio_no_es_oficial():
@@ -378,3 +391,25 @@ def test_valor_leido_por_el_otro_motor():
     """Si lo que leyó un motor no encaja (letra final «0»), se usa la lectura del otro."""
     d = doc(("NIF", 0.1, 0.2, 0.05), ("123456780", 0.1, 0.215, 0.15, 0.012, "12345678Z"), ("Fecha: 10/06/2025", 0.1, 0.3))
     assert extraer("formacion_art19", d)[0]["nif_trabajador"] == "12345678Z"
+
+
+def _titulo_con(linea_nombre):
+    return doc(("Considerando que, conforme a las disposiciones vigentes,", 0.2, 0.3, 0.6),
+               (linea_nombre, 0.25, 0.35, 0.5),
+               ("Máster Universitario en Prevención de Riesgos Laborales", 0.2, 0.45, 0.6),
+               ("por la Universidad de Ejemplo", 0.3, 0.5), ("Dado en Madrid, a 3 de octubre de 2017", 0.35, 0.6))
+
+
+@pytest.mark.parametrize("linea,trat", [("Don Miguel Ángel Pérez Cuadro", "DON"),
+                                        ("Doña Lucía Ortega Peña", "DOÑA"),
+                                        ("D. Luis Gómez Ruiz", "DON"),
+                                        ("Dña. Marta Sanz Vidal", "DOÑA")])
+def test_titular_tras_don_dona(linea, trat):
+    c, v = extraer("ts_prl", _titulo_con(linea))
+    assert c["tratamiento"] == trat and v["titular_tras_don_dona"] is True
+
+
+def test_titular_con_d_dna_no_dice_el_sexo():
+    c, v = extraer("ts_prl", _titulo_con("D./Dña. Luis Gómez Ruiz con NIF 01234567L"))
+    assert c["titular"] == "LUIS GOMEZ RUIZ" and "tratamiento" not in c
+    assert v["titular_tras_don_dona"] is False

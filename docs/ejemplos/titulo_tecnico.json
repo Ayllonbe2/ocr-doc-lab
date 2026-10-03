@@ -1,74 +1,79 @@
 {
-  "tipo": "flc_60h",
+  "tipo": "titulo_tecnico",
   "lectura": "COMPLETA",
   "origen": "pdf_digital",
   "paginas": 1,
   "campos": {
     "titular": {
-      "valor": "CASTRO GOMEZ, JAVIER",
+      "valor": "JAVIER CASTRO GOMEZ",
       "origen": "capa_texto",
       "confianza": 1.0,
       "pagina": 1
     },
-    "nif": {
-      "valor": "29289087J",
+    "tratamiento": {
+      "valor": "DON",
       "origen": "capa_texto",
       "confianza": 1.0,
       "pagina": 1
     },
     "fecha": {
-      "valor": "2025-11-30",
+      "valor": "2022-11-25",
       "origen": "capa_texto",
       "confianza": 1.0,
       "pagina": 1
     },
-    "horas": {
-      "valor": 60,
+    "titulo": {
+      "valor": "GRADUADO EN INGENIERIA EN TECNOLOGIAS INDUSTRIALES",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "profesion": {
+      "valor": "ingeniero_industrial",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "universidad": {
+      "valor": "UNIVERSIDAD DE PRUEBAS",
+      "origen": "capa_texto",
+      "confianza": 1.0,
+      "pagina": 1
+    },
+    "titulo_oficial": {
+      "valor": true,
       "origen": "capa_texto",
       "confianza": 1.0,
       "pagina": 1
     },
     "numero_registro": {
-      "valor": "378506/917810/8195194",
-      "origen": "capa_texto",
-      "confianza": 1.0,
-      "pagina": 1
-    },
-    "numero_curso": {
-      "valor": "99622188896MAD",
-      "origen": "capa_texto",
-      "confianza": 1.0,
-      "pagina": 1
-    },
-    "entidad": {
-      "valor": "FORMACION PREVENTIVA NORTE SL",
+      "valor": "2022/378506",
       "origen": "capa_texto",
       "confianza": 1.0,
       "pagina": 1
     }
   },
   "validaciones": {
-    "titular_tras_don_dona": false,
-    "nif_letra_valida": true,
-    "horas_minimo_60": true,
-    "menciona_convenio_construccion": true,
+    "titular_tras_don_dona": true,
+    "habilita_coordinador_seguridad_salud": true,
+    "titulo_oficial": true,
     "fecha_no_futura": true
   },
   "clasificacion": {
-    "tipo_detectado": "flc_60h",
-    "confianza": 0.73,
+    "tipo_detectado": "titulo_tecnico",
+    "confianza": 0.69,
     "candidatos": [
       {
-        "tipo": "flc_60h",
-        "puntos": 9.5
-      },
-      {
-        "tipo": "formacion_art19",
-        "puntos": 2.5
+        "tipo": "titulo_tecnico",
+        "puntos": 9
       },
       {
         "tipo": "ts_prl",
-        "puntos": 2
+        "puntos": 3
+      },
+      {
+        "tipo": "ts_riesgos",
+        "puntos": 0.5
       }
     ],
     "coincide": true

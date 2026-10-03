@@ -2,7 +2,9 @@
 
 OCR **local, sin nube**, para documentos: un **laboratorio** para evaluar y calibrar, y un
 **servicio** HTTP que usa el mismo código y solo escucha en localhost. Cubre el DNI español y
-16 tipos de documento: titulaciones de prevención, documentos de empresa (certificados de la
+18 tipos de documento: titulaciones (de prevención y, para coordinador de seguridad y salud,
+el título de arquitecto, arquitecto técnico o ingeniero industrial y el curso de coordinador),
+documentos de empresa (certificados de la
 TGSS y la AEAT, póliza de RC, registro de empresas, apertura de centro, planes y evaluaciones) y
 del trabajador (contrato, reconocimiento médico y fichas firmadas). Ver
 [OCR local multi-documento](docs/ocr-multidocumento.md) y el [Roadmap](docs/roadmap.md).
@@ -63,7 +65,11 @@ Sin `tessdata/mrz.traineddata`, Tesseract usa el modelo `eng` (peor).
    ficticios (limpio, borroso, oscuro, sobreexpuesto, con reflejo, baja resolución).
 2. Arrastra **fotos reales del reverso** hechas con móvil, como las que subiría un usuario.
    Con 20–30 fotos variadas (buena luz, poca luz, con flash, movidas…) ya se ven diferencias.
-3. Para cada foto verás:
+3. **Orientación.** Antes de analizarla, cada foto se gira (0/90/180/270°) hasta dejar el
+   DNI derecho: la forma de la tarjeta dice si está en vertical o apaisada, y una lectura
+   rápida con RapidOCR (sin su corrector de ángulo) decide en qué posición se lee mejor el
+   texto. Si se ha girado, la cabecera de la foto lo indica («↻ girada 90°»). Tarda ~1–1,5 s.
+   Para cada foto verás:
    - la foto con la MRZ localizada (verde) y los reflejos (rojo), y el recorte de la MRZ;
    - la **calidad** por métrica, en la foto entera y en la zona MRZ, con semáforo y veredicto:
      *Apta*, *Apta con riesgo* o *Rechazar*;
@@ -88,9 +94,24 @@ Sin `tessdata/mrz.traineddata`, Tesseract usa el modelo `eng` (peor).
    tabla compara «por etiqueta» y «por posición». Es lo que más ayuda a Tesseract: con fotos
    sintéticas «de móvil» pasa de 0–2 campos a 6–7. La plantilla está pensada para el DNI 4.0;
    el 3.0 tiene otra disposición.
-5. El **resumen del lote** da el porcentaje de acierto por motor y cruza calidad con lectura.
+5. **Cotejo anverso ↔ reverso.** Si subes las dos caras, cada reverso se empareja con el
+   anverso del mismo nº de DNI (o, si no, con el siguiente sin pareja; se puede cambiar a mano)
+   y se comparan nº de DNI, nacimiento, apellidos, nombre y caducidad: **Cuadra**, **Revisar**
+   (falta algún campo o un nombre solo se parece: al menos un 70 % de similitud, posible error de OCR) o
+   **No cuadra**. Del anverso se toma, de todo lo leído (cada motor, por etiqueta y por
+   posición), el valor que coincide con la MRZ. En los nombres se ignoran tildes, «Ñ»/«N» y
+   guiones, y se admite que la MRZ corte un nombre largo (la línea tiene 30 caracteres).
+   **Resultado final: APTO o NO APTO para validar la identidad** (sin mirar la calidad de la
+   foto). **APTO** si la MRZ es válida, el DNI y las fechas coinciden y el nombre y los
+   apellidos tienen al menos un 70 % de similitud. Cualquier otro caso es **NO APTO**, con el
+   motivo: algún dato distinto, MRZ no válida, algún dato sin leer o falta una de las caras.
+   La calidad de la foto es solo informativa: si el cotejo aprueba, no se muestra; si no, se
+   enseña como posible causa. Opcionalmente se escriben los **datos que pone la persona**
+   (nº de DNI y nombre completo): el DNI tiene que ser igual al leído y el nombre parecerse al
+   menos un 70 % (sin importar tildes ni el orden «nombre apellidos» / «apellidos nombre»).
+6. El **resumen del lote** da el porcentaje de acierto por motor y cruza calidad con lectura.
    En el anverso, una lectura cuenta como válida si el nº de DNI trae la letra correcta.
-6. **Descargar CSV**: métricas y aciertos por foto, sin datos personales (ni DNI ni nombres).
+7. **Descargar CSV**: métricas y aciertos por foto, sin datos personales (ni DNI ni nombres).
 
 El modo por lotes (`mrzlab.lote`) sigue midiendo solo el reverso (MRZ).
 
@@ -146,7 +167,7 @@ python -m mrzlab.lote CARPETA --csv resultados.csv --procesos 4
 - Recorre la carpeta y sus subcarpetas (JPG, PNG, WEBP, TIFF, BMP).
 - `--procesos N`: análisis en paralelo. Cada proceso usa un hilo, así que pon como mucho el
   número de núcleos. Como referencia, 150 fotos con los 3 motores y 4 procesos tardan unos 4 min.
-- `--motores tesseract,rapidocr`: solo esos motores. `--max 100`: solo las 100 primeras.
+- `--motores tesseract,rapidocr`: esos motores (por defecto, solo `rapidocr`). `--max 100`: solo las 100 primeras.
 - Escribe un CSV sin datos personales e imprime un resumen en la terminal.
 
 Con Docker (en PowerShell, desde la carpeta del repositorio; cambia `C:\ruta\fotos` por la tuya):
@@ -254,9 +275,11 @@ se llevarían después a producción, para pedir otra foto al usuario *antes* de
 | `rapidocr` | Modelos PP-OCR de **PaddleOCR** ejecutados con ONNX Runtime (sin instalar PaddlePaddle). Lee el recorte de la MRZ y también la foto entera | Apache-2.0 |
 | `tesseract` | Tesseract 5 sobre el recorte de la MRZ, con el modelo `mrz` entrenado en la fuente OCR-B | Apache-2.0 (programa); el modelo `mrz`, **AGPL-3.0** (ver abajo) |
 
-Además, la página y el lote muestran **`combinado`**: Tesseract primero (el más rápido) y,
-solo si no consigue una MRZ válida, RapidOCR. Es la combinación candidata para producción (las
-dos son Apache-2.0), y su tiempo es lo que costaría usarlas en cadena.
+**En el DNI solo se usa RapidOCR** (lab, lote y servicio): con fotos reales lee mejor que
+Tesseract. Tesseract sigue disponible para comparar (en la página, marcándolo; en el lote,
+`--motores tesseract,rapidocr`) y se sigue usando en los demás documentos. Si se piden los
+dos, la página y el lote muestran también **`combinado`**: RapidOCR primero y, solo si no
+consigue una MRZ válida, Tesseract; su tiempo es lo que costaría usarlos en cadena.
 
 **Cómo lee cada motor.** Cada motor prueba varios preprocesados y **para en el primero que da
 una MRZ válida**:

@@ -10,9 +10,11 @@ from .base import NOMBRE, Campo, Hallazgo, buscar, campo, es_etiqueta, limpiar_n
 
 # «D./DÑA.», «DON», «DOÑA», «D.», «DÑA.», «D/DÑA», «D./Dª.»
 _TRATAMIENTO = r"(?:\bD\.?\s*/\s*D(?:Ñ|N)?A?\.?|\bD\.?\s*/\s*Dª\.?|\bDON(?:A|ÑA)?\b|\bDOÑA\b|\bD(?:Ñ|N)A\.|\bD\.)"
-# Lo que suele ir justo detrás del nombre en una frase.
+# Lo que suele ir justo detrás del nombre en una frase. O el final de la fila, aunque quede
+# ruido del OCR (signos, números o letras sueltas de un borde decorativo: «… CUADRO . 2»).
 _TRAS_NOMBRE = (r"(?=\s*,?\s*(?:CON\b|PROVIST|TITULAR|MAYOR\b|NACID|DE\s+NACIONALIDAD|CUYO|"
-                r"N\.?I\.?F|D\.?N\.?I|N\.?I\.?E|HA\s|QUE\s|EN\s+CALIDAD|$))")
+                r"N\.?I\.?F|D\.?N\.?I|N\.?I\.?E|HA\s|QUE\s|EN\s+CALIDAD|"
+                r"[^A-ZÑ]*(?:\b[A-ZÑ]\b[^A-ZÑ]*)*$))")
 
 # Al principio de la línea: «… riesgos al trabajador» en una frase no es una etiqueta.
 _ETIQUETAS_NOMBRE = (r"^(?:NOMBRE\s+Y\s+APELLIDOS|APELLIDOS\s+Y\s+NOMBRE|APELLIDOS,\s*NOMBRE|"
@@ -41,6 +43,23 @@ def titular(doc, desde: int = 0, unico: bool = False) -> tuple[Campo | None, Hal
         if nombre:
             return campo(nombre, r[1]), None
     return None, None
+
+
+def tratamiento(hallazgo: Hallazgo | None) -> str | None:
+    """«DON» o «DOÑA» si el titular se ha leído tras ese tratamiento; None si no lo hay o es
+    ambiguo («D./Dña.»). Un nombre tras «Don/Doña» es más fiable: es como se escribe en los
+    títulos, y además dice si es hombre o mujer (para contrastarlo con lo declarado)."""
+    if hallazgo is None:
+        return None
+    m = hallazgo.match
+    previo = m.group(0)[:m.start(1) - m.start(0)].replace(" ", "")
+    if "/" in previo:
+        return None
+    if re.fullmatch(r"DON|D\.?", previo):
+        return "DON"
+    if re.fullmatch(r"DOÑA|DONA|D(?:Ñ|N)A\.?|Dª\.?", previo):
+        return "DOÑA"
+    return None
 
 
 _ETIQ_NIF = r"(?:N\.?\s?I\.?\s?F\.?|D\.?\s?N\.?\s?I\.?|N\.?\s?I\.?\s?E\.?|DOCUMENTO\s+NACIONAL\s+DE\s+IDENTIDAD)"
